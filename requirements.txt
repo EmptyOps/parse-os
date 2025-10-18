@@ -1,0 +1,13 @@
+click
+pydantic
+Pillow
+torch
+pytest
+pyautogui
+PyYAML
+requests
+numpy
+openai
+anthropic
+gradio_client
+dotenv
