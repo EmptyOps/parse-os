@@ -84,7 +84,8 @@ Three AI Agents (Main Planner, OmniParserEventExecutor, Validator).
 Task Abstraction Layer (TAL) — the shared contract schema between all agents.  
 Adapters — thin wrappers that let you plug in any repo or model without rewriting the system.  
 Registry — keeps track of which adapters are available.  
-Stays open and modular, so you can swap repositories, models, or tools (AskUI, ShowUI, OpenComputerUse, OS-Atlas, Sikuli, MCP-native tools).  
+It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli, AskUI, ShowUI, OpenComputerUse, and OS-Atlas.
+
 Is future-proof (ready to integrate new tools easily).
 
 ---
@@ -99,9 +100,9 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 
 Fork and Clone  
 
-	git clone https://github.com/EmptyOps/temp-parse-os.git  
-	cd temp-parse-os  
-	git remote add upstream https://github.com/<main-org>/temp-parse-os.git  
+	git clone https://github.com/EmptyOps/parse-os.git  
+	cd parse-os  
+	git remote add upstream https://github.com/<main-org>/parse-os.git   
 
 Create a New Branch  
 
@@ -122,21 +123,3 @@ Push and Create Pull Request (PR)
 Go to your fork on GitHub → Click “Compare & pull request”.  
 
 Use a clear title (e.g. feat: add plugin manager)  
-
-After Submitting PR  
-
-Maintainers will check your PR in a few days.  
-If they ask for changes, make updates in the same branch.  
-After approval, it will be squash-merged into the main branch to keep history clean.
-
----
-
-## 🧠 2. Guidelines & Best Practices  
-Keep PRs small, modular, and focused — easier to review and merge
-
----
-
-## 💬 3. Communication & Support  
-Discuss new ideas or architecture-level changes in Discussions or Issues.  
-Be kind, respectful, and collaborative — follow the Code of Conduct.  
-For help or clarifications, comment directly on your PR or open a short discussion thread.
