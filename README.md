@@ -44,7 +44,7 @@ Open collaboration ensures that OS Automation evolves through shared knowledge, 
 
 ---
 
-### 📊 Automation Benchmark Summary  
+### 📊 Testing Summary  
 
 | Run | Total Cases | Passed | X-Failed | Total Fail | % Success |
 |-----|--------------|--------|-----------|-------------|------------|
@@ -84,7 +84,7 @@ Three AI Agents (Main Planner, OmniParserEventExecutor, Validator).
 Task Abstraction Layer (TAL) — the shared contract schema between all agents.  
 Adapters — thin wrappers that let you plug in any repo or model without rewriting the system.  
 Registry — keeps track of which adapters are available.  
-It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli, AskUI, ShowUI, OpenComputerUse, and OS-Atlas.
+It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli and pyautogui.
 
 Is future-proof (ready to integrate new tools easily).
 
