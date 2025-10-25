@@ -55,27 +55,36 @@ Open collaboration ensures that OS Automation evolves through shared knowledge, 
 
 ---
 
-## 🚀 Getting Started  
+## 🚀 Getting Started
 
 To get started, just run the following command in your terminal:
 
+```
 python -m os_automation.cli.cli run "open browser and search for python tutorials"
+```
 
-💡 What it does:  
+💡 What it does:
 This command automatically opens your browser and searches for Python tutorials — helping you start learning Python right away!
 
-🪄 Step-by-Step (for Beginners):  
+---
 
-First, clone this repository to your system using:  
+### 🪄 Step-by-Step (for Beginners)
 
-git clone <repo_url>  
+1. Clone this repository to your system using:
+   ```
+   git clone <repo_url>
+   ```
+2. Make sure Python is installed on your computer.
 
-Make sure Python is installed on your computer.  
-Open your terminal or command prompt.  
-Navigate into the cloned project folder.  
-Run the following command:  
-python -m os_automation.cli.cli run "open browser and search for python tutorials"  
-Press Enter, and the automation will take care of the rest!
+3. Open your terminal or command prompt.
+
+4. Navigate into the cloned project folder.
+
+5. Run the following command:
+   ```
+   python -m os_automation.cli.cli run "open browser and search for python tutorials"
+   ```
+6. **Press Enter**, and the automation will take care of the rest! 🎉
 
 ---
 
