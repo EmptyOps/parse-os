@@ -66,7 +66,6 @@ python -m os_automation.cli.cli run "open browser and search for python tutorial
 💡 What it does:
 This command automatically opens your browser and searches for Python tutorials — helping you start learning Python right away!
 
----
 
 ### 🪄 Step-by-Step (for Beginners)
 
