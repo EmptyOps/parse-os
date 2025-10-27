@@ -87,22 +87,22 @@ This command automatically opens your browser and searches for Python tutorials 
 
 ---
 
-## 🏗️ Architecture – How It’s Built  
-Three AI Agents (Main Planner, OmniParserEventExecutor, Validator).  
-Task Abstraction Layer (TAL) — the shared contract schema between all agents.  
-Adapters — thin wrappers that let you plug in any repo or model without rewriting the system.  
-Registry — keeps track of which adapters are available.  
+## 🏗️ Architecture – How It’s Built
+
+- Three AI Agents — (Main Planner, OmniParserEventExecutor, Validator)  
+- Task Abstraction Layer (TAL)** — the shared contract schema between all agents  
+- Adapters — thin wrappers that let you plug in any repo or model without rewriting the system  
+- Registry — keeps track of which adapters are available  
+
 It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli and pyautogui.
 
-Is future-proof (ready to integrate new tools easily).
+**Is future-proof (ready to integrate new tools easily).**
 
 ---
 
 ## 🧩 Contribution Guide  
 We welcome contributions of all sizes — from documentation fixes to major feature improvements.  
 Please follow the simple flow below to keep reviews fast and collaboration smooth.
-
----
 
 ### ⚙️ 1. Standard Contribution Flow  
 
