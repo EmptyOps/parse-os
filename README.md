@@ -90,7 +90,7 @@ This command automatically opens your browser and searches for Python tutorials 
 ## 🏗️ Architecture – How It’s Built
 
 - Three AI Agents — (Main Planner, OmniParserEventExecutor, Validator)  
-- Task Abstraction Layer (TAL)** — the shared contract schema between all agents  
+- Task Abstraction Layer (TAL) — the shared contract schema between all agents  
 - Adapters — thin wrappers that let you plug in any repo or model without rewriting the system  
 - Registry — keeps track of which adapters are available  
 
