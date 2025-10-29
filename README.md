@@ -94,9 +94,9 @@ This command automatically opens your browser and searches for Python tutorials 
 - Adapters — thin wrappers that let you plug in any repo or model without rewriting the system  
 - Registry — keeps track of which adapters are available  
 
-It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli and pyautogui.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•It stays open and modular, allowing seamless integration with popular automation repositories, MCP-native tools, and visual automation frameworks such as Sikuli and pyautogui.
 
-**Is future-proof (ready to integrate new tools easily).**
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•**Is future-proof (ready to integrate new tools easily).**
 
 ---
 
@@ -119,6 +119,7 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 🔹 3.Make and Test Changes  
+
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Follow the project’s coding and commit style.  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Run existing tests or add new ones if needed.
 
@@ -126,18 +127,20 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 
 	git push origin feature/your-feature-name  
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Go to your fork on GitHub → Click “Compare & pull request”.  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager).
 
 🔹 5.After Submitting PR
+
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Maintainers will check your PR in a few days.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• If they ask for changes, make updates in the same branch.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• After approval, it will be squash-merged into the main branch to keep history clean.
 
 ### 🧠 Guidelines & Best Practices
+
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Keep PRs small, modular, and focused — easier to review and merge.
 
 ### 💬 Communication & Support
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•Discuss new ideas or architecture-level changes in [Discussions](https://www.reddit.com/r/ParseOS/) or [Issues](https://github.com/EmptyOps/parse-os/issues).
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•Be kind, respectful, and collaborative.
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;•For help or clarifications, comment directly on your PR or open a short discussion thread.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Discuss new ideas or architecture-level changes in [Discussions](https://www.reddit.com/r/ParseOS/) or [Issues](https://github.com/EmptyOps/parse-os/issues).  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Be kind, respectful, and collaborative.
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• For help or clarifications, comment directly on your PR or open a short discussion thread.
