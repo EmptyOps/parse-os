@@ -104,7 +104,7 @@ It stays open and modular, allowing seamless integration with popular automation
 We welcome contributions of all sizes — from documentation fixes to major feature improvements.  
 Please follow the simple flow below to keep reviews fast and collaboration smooth.
 
-### ⚙️ 1. Standard Contribution Flow  
+### ⚙️ Standard Contribution Flow  
 
 🔹 1.Fork and Clone  
 
@@ -120,14 +120,13 @@ Branches help keep your changes separate from the main code.
 Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 🔹 3.Make and Test Changes  
-
-Follow the project’s coding and commit style.  
-Run existing tests or add new ones if needed.
+&nbsp;- Follow the project’s coding and commit style.  
+&nbsp;- Run existing tests or add new ones if needed.
 
 🔹 4.Push and Create Pull Request (PR)  
 
 	git push origin feature/your-feature-name  
 
-Go to your fork on GitHub → Click “Compare & pull request”.  
+&nbsp;&nbsp;Go to your fork on GitHub → Click “Compare & pull request”.  
 
-Use a clear title (e.g. feat: add plugin manager)  
+&nbsp;&nbsp;Use a clear title (e.g. feat: add plugin manager)  
