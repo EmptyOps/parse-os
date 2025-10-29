@@ -127,6 +127,6 @@ Create a new branch whenever you fix a bug, add a new feature, or improve existi
 
 	git push origin feature/your-feature-name  
 
-&nbsp;&nbsp;Go to your fork on GitHub → Click “Compare & pull request”.  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Go to your fork on GitHub → Click “Compare & pull request”.  
 
-&nbsp;&nbsp;Use a clear title (e.g. feat: add plugin manager)  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager)  
