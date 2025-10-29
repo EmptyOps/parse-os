@@ -120,8 +120,8 @@ Branches help keep your changes separate from the main code.
 Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 🔹 3.Make and Test Changes  
-&nbsp;&nbsp;&nbsp;- Follow the project’s coding and commit style.  
-&nbsp;&nbsp;&nbsp;- Run existing tests or add new ones if needed.
+&nbsp;&nbsp;&nbsp;&nbsp;• Follow the project’s coding and commit style.  
+&nbsp;&nbsp;&nbsp;&nbsp;• Run existing tests or add new ones if needed.
 
 🔹 4.Push and Create Pull Request (PR)  
 
