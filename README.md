@@ -14,31 +14,31 @@ Our goal is to foster a positive shift in tech through collaboration and shared 
 Below are the broad technical and community goals of the OS Automation project.  
 Our focus is to build a smooth, flexible, and cost-effective automation system that can be confidently used in production environments while staying open-source and community-driven.
 
-🔹 1. Build Smooth & Production-Ready Automation  
+1. Build Smooth & Production-Ready Automation  
 Our first and foremost goal is to make operating system automation as smooth and reliable as possible.  
 We focus on using open-source solutions and tools that work efficiently in real-world, production-level systems — not just prototypes or demos.
 
-🔹 2. Create a Flexible & Extensible Architecture  
+2. Create a Flexible & Extensible Architecture  
 We design the system architecture to be highly modular and flexible, allowing easy integration or replacement of components.  
 This makes it simple to adopt new popular tools, MCP-based solutions, or open-source alternatives in the future without breaking the existing system.
 
-🔹 3. Keep It Cost-Effective and Scalable  
+3. Keep It Cost-Effective and Scalable  
 A key goal is to make the system cost-efficient without compromising performance.  
 We aim to reduce unnecessary API calls, heavy dependencies, and overhead so that users can run automation tasks at low operational cost while still being scalable for production use.
 
-🔹 4. Ensure Cross-Platform Compatibility  
+4. Ensure Cross-Platform Compatibility  
 OS Automation is built with the goal of supporting multiple operating systems and environments.  
 Whether users are on Linux, macOS, or Windows, our target is to deliver consistent behavior and easy setup across all supported platforms.
 
-🔹 5. Strengthen Testing & Reliability  
+5. Strengthen Testing & Reliability  
 We aim to include robust testing, logging, and validation mechanisms to ensure each automation command behaves predictably.  
 Error handling and retry logic are part of our core design to make the system production-ready and self-healing.
 
-🔹 6. Improve Developer Experience & Documentation  
+6. Improve Developer Experience & Documentation  
 We want every developer to get started easily.  
 Comprehensive documentation, clear examples, and simple “getting started” commands are part of our ongoing goal to make automation beginner-friendly and transparent.
 
-🔹 7. Build an Open Community  
+7. Build an Open Community  
 Our long-term vision includes growing an open developer community that collaborates, contributes new automation modules, and improves the ecosystem together.  
 Open collaboration ensures that OS Automation evolves through shared knowledge, transparency, and innovation.
 
@@ -106,30 +106,30 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 
 ### ⚙️ Standard Contribution Flow  
 
-🔹 1.Fork and Clone  
+1.Fork and Clone  
 
 	git clone https://github.com/EmptyOps/parse-os.git  
 	cd parse-os  
 	git remote add upstream https://github.com/<main-org>/parse-os.git   
 
-🔹 2.Create a New Branch  
+2.Create a New Branch  
 
 	git checkout -b issue/your-issue-name  
 
 - Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
-🔹 3.Make and Test Changes  
+3.Make and Test Changes  
 
 - Follow the project’s coding and commit style.  
 - Run existing tests or add new ones if needed.
 
-🔹 4.Push and Create Pull Request (PR)  
+4.Push and Create Pull Request (PR)  
 
 	git push origin feature/your-feature-name  
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager).
 
-🔹 5.After Submitting PR
+5.After Submitting PR
 
 - Maintainers will check your PR in a few days.
 - If they ask for changes, make updates in the same branch.
