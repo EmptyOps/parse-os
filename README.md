@@ -116,7 +116,7 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 	```
 	git checkout -b issue/your-issue-name  
 	```
-&nbsp;&nbsp;- Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
+&nbsp;&nbsp;&nbsp;&nbsp;• Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 3. Make and Test Changes  
 
