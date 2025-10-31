@@ -116,7 +116,7 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 	```
 	git checkout -b issue/your-issue-name  
 	```
-- Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
+&nbsp;&nbsp;- Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 3. Make and Test Changes  
 
@@ -127,7 +127,7 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 	```
 	git push origin feature/your-feature-name  
 	```
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager).
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager).
 
 5. After Submitting PR
 
