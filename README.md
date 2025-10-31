@@ -107,15 +107,15 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 ### ⚙️ Standard Contribution Flow  
 
 1. Fork and Clone  
-
+	```
 	git clone https://github.com/EmptyOps/parse-os.git  
 	cd parse-os  
 	git remote add upstream https://github.com/<main-org>/parse-os.git   
-
+	```
 2. Create a New Branch  
-
+	```
 	git checkout -b issue/your-issue-name  
-
+	```
 - Branches help keep your changes separate from the main code.Create a new branch whenever you fix a bug, add a new feature, or improve existing code — this keeps your work clean and easy to review.
 
 3. Make and Test Changes  
@@ -124,9 +124,9 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 - Run existing tests or add new ones if needed.
 
 4. Push and Create Pull Request (PR)  
-
+	```
 	git push origin feature/your-feature-name  
-
+	```
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• Use a clear title (e.g. feat: add plugin manager).
 
 5. After Submitting PR
