@@ -1,7 +1,7 @@
 # os_automation/repos/pyautogui_adapter.py
+from os_automation.tools.pyautogui.py_auto_tool import PyAutoTool
 from os_automation.core.adapters import BaseAdapter
-# from main_scripts.pyautogui_tool_wrapper import ToolWrapper as PyAutoTool
-from main_scripts.pyAutoGUI.tool_wrapper import ToolWrapper as PyAutoTool
+
 
 class PyAutoGUIAdapter(BaseAdapter):
     def __init__(self):

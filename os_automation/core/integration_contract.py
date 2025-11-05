@@ -1,6 +1,6 @@
 # os_automation/core/integration_contract.py
 from enum import Enum
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 

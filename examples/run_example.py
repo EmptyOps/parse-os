@@ -2,8 +2,9 @@
 Small example using orchestrator to run a prompt + image.
 Place a sample image at tests/sample.png for a quick test.
 """
-from os_automation.core.orchestrator import Orchestrator
 import pathlib
+
+from os_automation.core.orchestrator import Orchestrator
 
 if __name__ == "__main__":
     orchestrator = Orchestrator()

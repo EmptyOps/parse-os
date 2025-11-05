@@ -1,6 +1,9 @@
 # os_automation/core/registry.py
-from typing import Dict, Any, Optional
-from os_automation.core.integration_contract import IntegrationContract, IntegrationMode
+from typing import Any, Dict, Optional
+
+from os_automation.core.integration_contract import (IntegrationContract,
+                                                     IntegrationMode)
+
 
 class Registry:
     def __init__(self):

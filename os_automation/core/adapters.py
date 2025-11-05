@@ -1,7 +1,9 @@
 # os_automation/core/adapters.py
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
+
 from os_automation.core.integration_contract import IntegrationMode
+
 
 class BaseAdapter(ABC):
     # New metadata defaults that each adapter can override

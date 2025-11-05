@@ -1,9 +1,10 @@
-# main_scripts/omniparser_tool_wrapper.py
+# os_automation/tools/omni_parser_tool.py
 import os
 import sys
 from pathlib import Path
-from PIL import Image
+
 import torch
+from PIL import Image
 
 # Allow using OMNIPARSER_ROOT env var or configs->project_root
 OMNI_ROOT = os.environ.get("OMNIPARSER_ROOT", "").strip()
@@ -19,7 +20,7 @@ try:
 except Exception:
     HAS_REAL = False
 
-class ToolWrapper:
+class OmniParserTool:
     def __init__(self):
         self.device = torch.device("cpu")
         # load models if you want when OMNI is available - keep your logic unchanged here
@@ -47,3 +48,4 @@ class ToolWrapper:
             "text_0": {"type": "text", "bbox": abs_bbox, "content": "demo_text"}
         }
         return results
+

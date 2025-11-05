@@ -1,7 +1,8 @@
+from os_automation.agents.executor_agent import ExecutorAgent
 from os_automation.core.registry import registry
 from os_automation.repos.omniparser_adapter import OmniParserAdapter
 from os_automation.repos.pyautogui_adapter import PyAutoGUIAdapter
-from os_automation.agents.executor_agent import ExecutorAgent
+
 
 def test_detect_and_execute_flow(tmp_image):
     # register safe adapters

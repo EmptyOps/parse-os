@@ -1,9 +1,9 @@
-# main_scripts/os_assistance.sikuli/os_assistance.py
-import sys
-import os
+# os_automation/tools/os_assistance_sikuli/os_assistance.py
 import json
-import time
 import logging
+import os
+import sys
+import time
 
 # ---------------- Logging Setup ----------------
 LOG = logging.getLogger(__name__)
@@ -17,12 +17,13 @@ if ROOT_DIR not in sys.path:
 
 # ---------------- Tool Paths ----------------
 TOOL_PATHS = {
-    "sikuli": os.path.join(ROOT_DIR, "main_scripts", "os_assistance.sikuli"),
-    "pyautogui": os.path.join(ROOT_DIR, "main_scripts", "pyAutoGUI")
+    "sikuli": os.path.join(ROOT_DIR, "os_automation", "tools", "os_assistance_sikuli"),
+    "pyautogui": os.path.join(ROOT_DIR, "os_automation", "tools", "pyautogui")
 }
 
 # ---------------- OS Assistance Class ----------------
-class OSAssistance:
+#class OSAssistance:
+class OSAssistanceWrapper:
     def __init__(self, tool_name=None, tool_wrapper=None):
         """
         tool_name: Optional - 'sikuli' or 'pyautogui'
@@ -32,45 +33,20 @@ class OSAssistance:
         self.tool_name = tool_name
 
         if tool_wrapper is None:
-            if tool_name not in TOOL_PATHS:
+            # Use static imports for clarity and stability
+            if tool_name == "pyautogui":
+                from os_automation.tools.pyautogui.py_auto_tool import PyAutoTool
+                self.tool = PyAutoTool()
+            elif tool_name == "sikuli":
+                from os_automation.tools.tool_wrapper_sikuli.sikuli_tool import SikuliTool
+                self.tool = SikuliTool()
+            else:
                 raise ValueError(f"Unsupported tool '{tool_name}', choose from: {list(TOOL_PATHS.keys())}")
-            sys.path.insert(0, os.path.abspath(TOOL_PATHS[tool_name]))
-            ToolWrapper = __import__("tool_wrapper", fromlist=["ToolWrapper"]).ToolWrapper
-            self.tool = ToolWrapper()
-            LOG.info(f"Loaded {tool_name} ToolWrapper dynamically")
+
+            LOG.info(f"Loaded {tool_name} ToolWrapper statically")
         else:
             self.tool = tool_wrapper
             LOG.info(f"Using passed-in ToolWrapper: {tool_name}")
-
-    # def handle_event(self, bbox, event_type, text=None, scroll_dir=None, delay=0):
-    #     if not bbox or len(bbox) < 4:
-    #         raise ValueError("Invalid bbox provided to handle_event")
-
-    #     x, y, w, h = bbox
-    #     center_x = x + w // 2
-    #     center_y = y + h // 2
-
-    #     LOG.info(f"[OSAssistance] Event={event_type}, Pos=({center_x},{center_y}), Text={text}, Scroll={scroll_dir}")
-
-    #     if event_type == 'click':
-    #         print(f"[DEBUG] 🖱️ click({center_x}, {center_y}) via {self.tool_name}")
-    #         self.tool.click(center_x, center_y)
-    #         if delay > 0 and scroll_dir:
-    #             time.sleep(delay)
-    #             self.tool.scroll(center_x, center_y, scroll_dir)
-
-    #     elif event_type == 'type':
-    #         if not text:
-    #             raise ValueError("Text required for 'type' event.")
-    #         self.tool.type_text(center_x, center_y, text)
-
-    #     elif event_type == 'scroll':
-    #         if scroll_dir not in ['up', 'down']:
-    #             raise ValueError("Scroll direction must be 'up' or 'down'.")
-    #         self.tool.scroll(center_x, center_y, scroll_dir)
-
-    #     else:
-    #         raise ValueError(f"Unsupported event_type: {event_type}")
 
     def handle_event(self, bbox, event_type, text=None, scroll_dir=None, delay=0):
         if not bbox or len(bbox) < 4:
@@ -80,7 +56,7 @@ class OSAssistance:
         center_x = x + w // 2
         center_y = y + h // 2
 
-        LOG.info(f"[OSAssistance] Event={event_type}, Pos=({center_x},{center_y}), Text={text}, Scroll={scroll_dir}")
+        LOG.info(f"[OSAssistanceWrapper] Event={event_type}, Pos=({center_x},{center_y}), Text={text}, Scroll={scroll_dir}")
 
         # ✅ CLICK EVENT
         if event_type == 'click':
@@ -133,7 +109,7 @@ class OSAssistance:
 # ---------------- CLI Compatibility ----------------
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python os_assistance.py '<bbox>' <event1> [arg1] ... [--delay seconds] [--tool sikuli|pyautogui]")
+        print("Usage: python os_assistance_wrapper.py '<bbox>' <event1> [arg1] ... [--delay seconds] [--tool sikuli|pyautogui]")
         sys.exit(1)
 
     bbox_str = sys.argv[1]
@@ -160,12 +136,13 @@ def main():
 
     # ---------------- Load Wrappers ----------------
     try:
-        from main_scripts.pyAutoGUI.tool_wrapper import ToolWrapper as PyAutoTool
+        from os_automation.tools.pyautogui.py_auto_tool import PyAutoTool
     except ImportError:
         PyAutoTool = None
 
     try:
-        from main_scripts.sikuli_tool_wrapper import ToolWrapper as SikuliTool
+        from os_automation.tools.tool_wrapper_sikuli.sikuli_tool import SikuliTool
+
     except ImportError:
         SikuliTool = None
 
@@ -178,7 +155,7 @@ def main():
             raise ImportError("Sikuli wrapper not found!")
         tool_wrapper = SikuliTool()
 
-    assistant = OSAssistance(tool_name=tool_name, tool_wrapper=tool_wrapper)
+    assistant = OSAssistanceWrapper(tool_name=tool_name, tool_wrapper=tool_wrapper)
 
     # ---------------- Process Events ----------------
     i = 0

@@ -1,4 +1,6 @@
-from os_automation.core.tal import PlannedStep, ExecutionResult, ValidationReport
+from os_automation.core.tal import (ExecutionResult, PlannedStep,
+                                    ValidationReport)
+
 
 def test_planned_step_and_models():
     p = PlannedStep(step_id=1, description="Open terminal")

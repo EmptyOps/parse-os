@@ -1,7 +1,10 @@
+from pathlib import Path
+
 import pytest
 from PIL import Image
-from pathlib import Path
+
 from os_automation.core.registry import registry
+
 
 @pytest.fixture(autouse=True)
 def isolate_registry():

@@ -1,6 +1,8 @@
 # os_automation/agents/main_ai.py
 from typing import List
+
 from os_automation.core.tal import PlannedStep
+
 
 class MainAIAgent:
     def plan(self, user_prompt: str) -> List[PlannedStep]:

@@ -1,5 +1,6 @@
 from os_automation.core.registry import registry
 
+
 def test_register_and_get_adapter():
     registry.register_adapter("fake", lambda: "ok")
     assert "fake" in registry.list_adapters()

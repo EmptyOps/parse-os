@@ -1,6 +1,7 @@
+from os_automation.agents.executor_agent import ExecutorAgent
 from os_automation.core.registry import registry
 from os_automation.repos.pyautogui_adapter import PyAutoGUIAdapter
-from os_automation.agents.executor_agent import ExecutorAgent
+
 
 class MockMCPAdapter:
     def execute(self, step):

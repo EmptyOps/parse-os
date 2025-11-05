@@ -1,6 +1,7 @@
 # os_automation/repos/mcp_adapter.py
 import os
 import shutil
+
 from os_automation.core.adapters import BaseAdapter
 from os_automation.core.integration_contract import IntegrationMode
 

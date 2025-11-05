@@ -1,5 +1,6 @@
 from os_automation.agents.validator_agent import ValidatorAgent
 
+
 def test_validator_combined_pass():
     validator = ValidatorAgent()
     step = {"step_id": 1, "description": "Open terminal"}

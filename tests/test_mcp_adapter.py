@@ -5,10 +5,9 @@ from pathlib import Path
 # Add project root to sys.path for imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from os_automation.agents.executor_agent import ExecutorAgent
 from os_automation.core.registry import registry
 from os_automation.repos.mcp_adapter import MCPFileSystemAdapter
-from os_automation.agents.executor_agent import ExecutorAgent
-
 
 # def test_mcp_folder_creation(tmp_path):
 #     """

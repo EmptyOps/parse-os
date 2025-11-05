@@ -1,16 +1,10 @@
 # os_automation/repos/sikuli_adapter.py
-from os_automation.core.adapters import BaseAdapter
-# from main_scripts.sikuli_tool_wrapper import ToolWrapper as SikuliTool
 import os
 import sys
 
-# Add project root (PARSE_OS) to sys.path dynamically
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "../../.."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+from os_automation.tools.tool_wrapper_sikuli.sikuli_tool import SikuliTool
 
-from main_scripts.sikuli_tool_wrapper import ToolWrapper as SikuliTool
+from os_automation.core.adapters import BaseAdapter
 
 
 class SikuliAdapter(BaseAdapter):

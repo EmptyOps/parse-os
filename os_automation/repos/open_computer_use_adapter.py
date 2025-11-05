@@ -1,12 +1,14 @@
 # os_automation/repos/open_computer_use_adapter.py
-import os
-import sys
 import asyncio
 import importlib.util
+import os
+import sys
 from typing import Any, Optional
-from os_automation.utils.logger import log
+
 from os_automation.core.adapters import BaseAdapter
 from os_automation.core.integration_contract import IntegrationMode
+from os_automation.utils.logger import log
+
 
 class OpenComputerUseAdapter(BaseAdapter):
     """
@@ -165,10 +167,10 @@ class OpenComputerUseAdapter(BaseAdapter):
         """
         import os
         import pty
+        import select
         import subprocess
         import sys
         import time
-        import select
 
         prompt = step_payload.get("text") or step_payload.get("event") or None
         main_path = os.path.join(self.base_path, "main.py")

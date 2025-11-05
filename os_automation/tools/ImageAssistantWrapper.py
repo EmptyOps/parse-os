@@ -1,9 +1,13 @@
-from main_scripts.omniparser_tool_wrapper import ToolWrapper
+# os_automation/tools/ImageAssistantWrapper.py
+
 from pathlib import Path
 
-class ImageAssistant:
+from os_automation.tools.omni_parser_tool import OmniParserTool
+
+
+class ImageAssistantWrapper:
     def __init__(self):
-        self.tool = ToolWrapper()
+        self.tool = OmniParserTool()
 
     def analyze(self, image_path):
         image_path = Path(image_path)
@@ -14,11 +18,11 @@ class ImageAssistant:
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Usage: python image_assistant.py <image_path>")
+        print("Usage: python ImageAssistantWrapper.py <image_path>")
         sys.exit(1)
 
     image_path = sys.argv[1]
-    assistant = ImageAssistant()
+    assistant = ImageAssistantWrapper()
     results = assistant.analyze(image_path)
     
     print("Extracted content from image using OmniParser:")

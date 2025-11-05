@@ -1,10 +1,12 @@
 # os_automation/repos/omniparser_adapter.py
+from os_automation.tools.omni_parser_tool import OmniParserTool
+
 from os_automation.core.adapters import BaseAdapter
-from main_scripts.omniparser_tool_wrapper import ToolWrapper
+
 
 class OmniParserAdapter(BaseAdapter):
     def __init__(self):
-        self.tool = ToolWrapper()
+        self.tool = OmniParserTool()
 
     def detect(self, step):
         image_path = step.get("image_path")

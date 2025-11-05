@@ -1,5 +1,6 @@
 from os_automation.core.orchestrator import Orchestrator
 
+
 def test_basic_flow():
     orch = Orchestrator()
     result = orch.run("Open terminal and run ls")

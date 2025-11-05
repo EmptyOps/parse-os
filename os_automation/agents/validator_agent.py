@@ -1,7 +1,9 @@
 # os_automation/agents/validator_agent.py
 from typing import Dict
+
 from os_automation.validators.bbox_validator import BoundingBoxValidator
 from os_automation.validators.event_validator import EventValidator
+
 
 class ValidatorAgent:
     def __init__(self):

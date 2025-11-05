@@ -1,7 +1,9 @@
 # os_automation/agents/executor_agent.py
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from os_automation.core.registry import registry
 from os_automation.core.tal import ExecutionResult
+
 
 class ExecutorAgent:
     """

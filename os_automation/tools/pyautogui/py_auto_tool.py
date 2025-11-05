@@ -1,8 +1,12 @@
-import pyautogui
-import time
-import sys
+#  os_automation/tools/pyautogui/py_auto_tool.py
 
-class ToolWrapper:
+import sys
+import time
+
+import pyautogui
+
+
+class PyAutoTool:
     def __init__(self, delay=0.2):
         self.delay = delay
         print("[DEBUG] ✅ PyAutoGUI ToolWrapper initialized and active", flush=True, file=sys.stderr)

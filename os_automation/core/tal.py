@@ -1,6 +1,8 @@
 # os_automation/core/tal.py
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+
 
 class PlannedStep(BaseModel):
     step_id: int

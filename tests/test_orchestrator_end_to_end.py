@@ -3,6 +3,7 @@ from os_automation.core.registry import registry
 from os_automation.repos.omniparser_adapter import OmniParserAdapter
 from os_automation.repos.pyautogui_adapter import PyAutoGUIAdapter
 
+
 def test_orchestrator_run(tmp_image):
     # Ensure the orchestrator will have adapters available by registering safe ones
     registry.register_adapter("omniparser", OmniParserAdapter)
