@@ -1,3 +1,7 @@
+## NOTE 
+We’re still preparing for our *internally tested Alpha release* — the system isn’t production-ready yet.
+Our *initial internal release* was made on *18 Oct 2025*, and we plan to roll out *four revisions* before alpha release become available for public testing.
+
 # ParseOS  
 **Open-source automation with purpose.**
 
