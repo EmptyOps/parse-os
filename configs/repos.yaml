@@ -12,9 +12,12 @@ detection_adapters:
     path: os_automation.repos.open_computer_use_adapter.OpenComputerUseAdapter
 
 executor_adapters:
-  pyautogui:
+  sikuli:
     type: class
     path: os_automation.repos.sikuli_adapter.SikuliAdapter  # or pyautogui executor wrapper
+  pyautogui:
+    type: class
+    path: os_automation.repos.pyautogui_adapter.PyAutoGUIAdapter
   mcp_filesystem:
     type: class
     path: os_automation.repos.mcp_filesystem_adapter.MCPFileSystemAdapter

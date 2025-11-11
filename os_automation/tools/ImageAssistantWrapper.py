@@ -4,7 +4,6 @@ from pathlib import Path
 
 from os_automation.tools.omni_parser_tool import OmniParserTool
 
-
 class ImageAssistantWrapper:
     def __init__(self):
         self.tool = OmniParserTool()

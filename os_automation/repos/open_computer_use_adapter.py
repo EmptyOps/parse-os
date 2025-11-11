@@ -4,11 +4,9 @@ import importlib.util
 import os
 import sys
 from typing import Any, Optional
-
 from os_automation.core.adapters import BaseAdapter
 from os_automation.core.integration_contract import IntegrationMode
 from os_automation.utils.logger import log
-
 
 class OpenComputerUseAdapter(BaseAdapter):
     """
@@ -94,72 +92,6 @@ class OpenComputerUseAdapter(BaseAdapter):
         except Exception as e:
             log.error(f"Failed to start OpenComputerUse sandbox: {e}")
 
-    # def execute(self, step_payload: dict):
-    #     """
-    #     Execute a high-level prompt using the OpenComputerUse agent.
-    #     This function is synchronous from the caller's perspective and will run the repo's async 'start' coroutine
-    #     to completion (or until it returns).
-    #     """
-    #     oc = self._load_oc_module()
-    #     prompt = step_payload.get("text") or step_payload.get("event") or "Perform generic step"
-
-    #     # Ensure output dir exists
-    #     output_dir = os.path.join(self.base_path, "adapter_output")
-    #     os.makedirs(output_dir, exist_ok=True)
-
-    #     loop = self._ensure_loop()
-
-    #     async def _run_once():
-    #         # Try the most common signature(s) for compatibility with different repo versions
-    #         try:
-    #             return await oc.start(user_input=prompt, output_dir=output_dir)
-    #         except TypeError:
-    #             try:
-    #                 return await oc.start(prompt)
-    #             except TypeError:
-    #                 # as a last fallback, call start() without args
-    #                 return await oc.start()
-
-    #     try:
-    #         # If the loop is already running in this thread, schedule and wait via run_coroutine_threadsafe
-    #         if loop.is_running():
-    #             fut = asyncio.run_coroutine_threadsafe(_run_once(), loop)
-    #             result = fut.result(timeout=120)
-    #         else:
-    #             # run the coroutine to completion in our loop
-    #             result = loop.run_until_complete(_run_once())
-
-    #         # Normalize result for orchestrator
-    #         observation = None
-    #         if isinstance(result, dict):
-    #             observation = result.get("observation") or result.get("result") or str(result)
-    #         else:
-    #             observation = str(result)
-
-    #         # Debug trace
-    #         log.info(f"[OpenComputerUseAdapter] Observation: {observation}")
-
-    #         return {
-    #             "status": "success",
-    #             "observation": observation,
-    #             "raw": result
-    #         }
-
-    #     except Exception as e:
-    #         log.error(f"❌ Failed to execute OpenComputerUse step: {e}")
-    #         return {"status": "failed", "detail": str(e)}
-
-    #     finally:
-    #         # Try a graceful cleanup of the loop if we created it and it is not running tasks we want to keep.
-    #         try:
-    #             if self.loop and not self.loop.is_closed() and not self.loop.is_running():
-    #                 # Close only if it's our loop and not running
-    #                 self.loop.stop()
-    #                 self.loop.close()
-    #                 self.loop = None
-    #         except Exception:
-    #             # ignore cleanup errors; leaving loop open is safer than killing running tasks unexpectedly
-    #             pass
     def execute(self, step_payload: dict):
         """
         Persistent passthrough execution (interactive session):

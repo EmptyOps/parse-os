@@ -3,7 +3,6 @@ from os_automation.tools.omni_parser_tool import OmniParserTool
 
 from os_automation.core.adapters import BaseAdapter
 
-
 class OmniParserAdapter(BaseAdapter):
     def __init__(self):
         self.tool = OmniParserTool()
