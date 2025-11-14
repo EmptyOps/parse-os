@@ -1,4 +1,34 @@
-# configs/repos.yaml
+# # configs/repos.yaml
+
+# detection_adapters:
+#   omniparser:
+#     type: class
+#     path: os_automation.repos.omniparser_adapter.OmniParserAdapter
+#   osatlas:
+#     type: class
+#     path: os_automation.repos.osatlas_adapter.OSAtlasAdapter
+#   open_computer_use:
+#     type: class
+#     path: os_automation.repos.open_computer_use_adapter.OpenComputerUseAdapter
+
+# executor_adapters:
+#   sikuli:
+#     type: class
+#     path: os_automation.repos.sikuli_adapter.SikuliAdapter  # or pyautogui executor wrapper
+#   pyautogui:
+#     type: class
+#     path: os_automation.repos.pyautogui_adapter.PyAutoGUIAdapter
+#   mcp_filesystem:
+#     type: class
+#     path: os_automation.repos.mcp_filesystem_adapter.MCPFileSystemAdapter
+#   open_computer_use:
+#     type: class
+#     path: os_automation.repos.open_computer_use_adapter.OpenComputerUseAdapter
+
+# default_tools:
+#   detection: open_computer_use       # 🔹 if set to open_computer_use, will fire that adapter
+#   executor: open_computer_use        # 🔹 can still fallback to visual if MCP not used
+
 
 detection_adapters:
   omniparser:
@@ -14,7 +44,7 @@ detection_adapters:
 executor_adapters:
   sikuli:
     type: class
-    path: os_automation.repos.sikuli_adapter.SikuliAdapter  # or pyautogui executor wrapper
+    path: os_automation.repos.sikuli_adapter.SikuliAdapter
   pyautogui:
     type: class
     path: os_automation.repos.pyautogui_adapter.PyAutoGUIAdapter
@@ -26,7 +56,7 @@ executor_adapters:
     path: os_automation.repos.open_computer_use_adapter.OpenComputerUseAdapter
 
 default_tools:
-  detection: open_computer_use       # 🔹 if set to open_computer_use, will fire that adapter
-  executor: open_computer_use        # 🔹 can still fallback to visual if MCP not used
+  detection: osatlas        # ✅ switch from open_computer_use
+  executor: pyautogui       # ✅ switch from open_computer_use
 
 
