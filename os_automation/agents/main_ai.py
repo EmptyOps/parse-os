@@ -112,122 +112,100 @@
 #         return planned
 
 
+
 # os_automation/agents/main_ai.py
 import os
 import yaml
-import requests
 import logging
-from typing import List, Dict, Any
+import re
+from typing import List
 from os_automation.core.tal import PlannedStep
 
 logger = logging.getLogger(__name__)
 
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
+LOCAL_LLM_URL = os.environ.get("LOCAL_LLM_URL", "http://localhost:8002/generate")
+
 class MainAIAgent:
-    """
-    Planner agent:
-    - Prefer OpenAI (if OPENAI_API_KEY present) to generate YAML plan.
-    - Fallback to local LLM at LOCAL_LLM_URL if OpenAI fails or not configured.
-    - Final fallback: simple rule-based splitter.
-    Returns list[PlannedStep].
-    """
-
-    LOCAL_LLM_URL = os.environ.get("LOCAL_LLM_URL", "http://localhost:8002/generate")
-    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
     def __init__(self, planner_model: str = "gpt-4"):
         self.planner_model = planner_model
 
-    def _call_local_llm(self, prompt: str) -> str:
-        try:
-            r = requests.post(self.LOCAL_LLM_URL, json={"prompt": prompt, "max_tokens": 512}, timeout=10)
-            r.raise_for_status()
-            return r.json().get("text") or r.json().get("result") or r.text
-        except Exception as e:
-            logger.debug("Local LLM not available: %s", e)
-            raise
+    def _call_local(self, prompt: str) -> str:
+        import requests
+        r = requests.post(LOCAL_LLM_URL, json={"prompt": prompt}, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        # flexible keys
+        return data.get("text") or data.get("result") or r.text
 
     def _call_openai(self, prompt: str) -> str:
         try:
             import openai
-            openai.api_key = self.OPENAI_API_KEY
+            openai.api_key = OPENAI_KEY
             resp = openai.ChatCompletion.create(
                 model=self.planner_model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role":"user","content":prompt}],
                 max_tokens=512,
                 temperature=0.0
             )
-            print("🔑 OpenAI API key is call")
             return resp.choices[0].message.content
         except Exception as e:
             logger.debug("OpenAI call failed: %s", e)
             raise
 
-    def _simple_planner(self, user_prompt: str) -> List[Dict[str, Any]]:
+    def _simple_split(self, user_prompt: str):
+        # split on semicolons or newlines only to avoid splitting e.g. google.com
+        parts = [p.strip() for p in re.split(r'[;\n]+', user_prompt) if p.strip()]
+        if not parts:
+            parts = [user_prompt.strip()]
         steps = []
-        # better splitting: split by ; or . or newline
-        import re
-        sentences = [s.strip() for s in re.split(r'[;\.\n]+', user_prompt) if s.strip()]
-        for i, s in enumerate(sentences, start=1):
-            steps.append({"step_id": i, "description": s})
-        if not steps:
-            steps = [{"step_id": 1, "description": user_prompt}]
+        for i,p in enumerate(parts, start=1):
+            steps.append({"step_id": i, "description": p})
         return steps
 
-    def plan(self, user_prompt: str) -> List[PlannedStep]:
+    def plan(self, user_prompt: str):
         prompt = (
-            "You are an automation plan generator. Given the user instruction, produce a YAML "
-            "document containing a top-level 'steps' list. Each step must have 'step_id' (int) and 'description' (string). "
-            "Be concise. Return ONLY YAML and no other commentary.\n\n"
+            "You are an automation plan generator. Given the user instruction produce a YAML with top-level 'steps' list."
+            "Each entry must have step_id (int) and description (string). Return ONLY the YAML document.\n\n"
             f"User instruction: '''{user_prompt}'''\n\nYAML:"
         )
 
-        planner_text = None
-
-        # Prefer OpenAI if available
-        if self.OPENAI_API_KEY:
+        text = None
+        if OPENAI_KEY:
             try:
-                planner_text = self._call_openai(prompt)
+                text = self._call_openai(prompt)
             except Exception:
-                planner_text = None
+                text = None
 
-        # then try local LLM
-        if planner_text is None:
+        if text is None:
             try:
-                planner_text = self._call_local_llm(prompt)
+                text = self._call_local(prompt)
             except Exception:
-                planner_text = None
+                text = None
 
-        if planner_text:
+        if text:
+            # attempt to extract YAML
+            if "```" in text:
+                parts = text.split("```")
+                for p in parts:
+                    if p.strip().startswith("steps"):
+                        text = p
+                        break
+            idx = text.find("steps:")
+            if idx != -1:
+                text = text[idx:]
             try:
-                # strip triple-backtick fences and optional language markers
-                if "```" in planner_text:
-                    # take inner code block if present
-                    parts = planner_text.split("```")
-                    # try to find block that looks like YAML
-                    inner = None
-                    for p in parts:
-                        if p.strip().lstrip().startswith("steps"):
-                            inner = p
-                            break
-                    planner_text = inner or parts[-2] if len(parts) >= 2 else planner_text
-                # afford forgiving: sometimes models add leading text; attempt to find 'steps:' start
-                idx = planner_text.find("steps:")
-                if idx != -1:
-                    planner_text = planner_text[idx:]
-                data = yaml.safe_load(planner_text)
+                data = yaml.safe_load(text)
                 if isinstance(data, dict) and "steps" in data:
-                    steps = data["steps"]
                     planned = []
-                    for s in steps:
-                        sid = int(s.get("step_id") if s.get("step_id") is not None else s.get("id", 0))
-                        desc = s.get("description", str(s))
+                    for s in data["steps"]:
+                        sid = int(s.get("step_id") or s.get("id") or 0)
+                        desc = s.get("description") or str(s)
                         planned.append(PlannedStep(step_id=sid, description=desc))
                     return planned
             except Exception as e:
-                logger.debug("Failed to parse planner output as YAML: %s", e)
-                planner_text = None
+                logger.debug("Planner YAML parse error: %s", e)
 
-        # final fallback: rule-based
-        raw = self._simple_planner(user_prompt)
+        raw = self._simple_split(user_prompt)
         planned = [PlannedStep(step_id=s["step_id"], description=s["description"]) for s in raw]
         return planned

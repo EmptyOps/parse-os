@@ -336,24 +336,67 @@ class Orchestrator:
 
         # PARTIAL mode: your original pipeline (planner -> executor_agent -> validator)
         elif mode == IntegrationMode.PARTIAL:
-            print(f"[IntegrationMode: PARTIAL] Running multi-agent flow inside ExecutorAgent...")
+            print(f"[IntegrationMode: PARTIAL] Running enhanced 3-agent flow...")
 
-            # 1) Planner generates YAML steps
+            # ---------------------------
+            # 1️⃣ Planner Agent → YAML steps
+            # ---------------------------
             planned_steps = self.main_agent.plan(user_prompt)
 
-            # 2) ExecutorAgent now handles:
-            #    detection → event-decision → execution → validation → retries
-            result = self.executor_agent.run_multi_step(
-                planned_steps=planned_steps,
-                validator_agent=self.validator_agent
-            )
+            if not planned_steps:
+                return {
+                    "user_prompt": user_prompt,
+                    "overall_status": "failed",
+                    "reason": "Planner agent returned no steps",
+                    "mode": "partial"
+                }
 
-            # 3) Return normalized orchestrator output
+            final_step_reports = []
+
+            # ---------------------------
+            # 2️⃣ Execute each step with:
+            #     OSAtlas detection
+            #     LLM event planning
+            #     PyAutoGUI/Sikuli execution
+            #     screenshot before/after
+            #     validation and retry
+            # ---------------------------
+            for step in planned_steps:
+                print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
+
+                step_result = self.executor_agent.run_step(
+                    step_description=step.description,
+                    validator_agent=self.validator_agent,
+                    max_attempts=3
+                )
+
+                final_step_reports.append({
+                    "step": step.dict(),
+                    "execution": step_result.get("execution"),
+                    "validation": step_result.get("validation")
+                })
+
+                # Anything except "pass" = stop workflow
+                if step_result.get("validation", {}).get("validation_status") != "pass":
+                    print(f"❌ Step {step.step_id} FAILED — stopping execution.")
+                    return {
+                        "user_prompt": user_prompt,
+                        "overall_status": "failed",
+                        "mode": "partial",
+                        "steps": final_step_reports
+                    }
+
+            # ---------------------------
+            # 3️⃣ All steps passed
+            # ---------------------------
             return {
                 "user_prompt": user_prompt,
+                "overall_status": "success",
                 "mode": "partial",
-                **result
+                "steps": final_step_reports
             }
+
+        
         # HYBRID: a general example — tailor this to your adapter capabilities
         elif mode == IntegrationMode.HYBRID:
             detected = None
