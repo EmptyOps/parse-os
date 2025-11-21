@@ -161,53 +161,95 @@ class OSAtlasAdapter(BaseAdapter):
     # ---------------------------------------------------------
     # MAIN DETECT LOGIC (IMPROVED)
     # ---------------------------------------------------------
+        # ---------------------------------------------------------
+    # MAIN DETECT LOGIC (IMPROVED)
+    # ---------------------------------------------------------
     def detect(self, step: Dict[str, Any]) -> Dict[str, Any]:
         image_path = step.get("image_path")
-        text = step.get("text", step.get("description", ""))
+        text = (step.get("text", step.get("description", "")) or "").strip()
+
+        # Guard
+        if not image_path or not os.path.exists(image_path):
+            logger.warning("OSAtlasAdapter.detect: missing image_path %s", image_path)
+            return {"bbox": None, "point": None, "confidence": 0.0, "raw": {}, "type": "none"}
 
         resp = self._call_predict(image_path, text)
 
-        raw_xyxy = resp.get("response")
+        # model may return many shapes: try common keys first
+        raw_response = resp.get("response") or resp.get("bbox") or resp.get("raw_output") or resp.get("predictions") or resp.get("result") or resp
 
-        # -------------------------------
-        # 1) If provider returned xyxy
-        # -------------------------------
-        if isinstance(raw_xyxy, list) and len(raw_xyxy) == 4:
-            try:
-                x1, y1, x2, y2 = [int(v) for v in raw_xyxy]
-                left = min(x1, x2)
-                top = min(y1, y2)
-                right = max(x1, x2)
-                bottom = max(y1, y2)
-                w = max(1, right - left)
-                h = max(1, bottom - top)
-                return {
-                    "bbox": [left, top, w, h],
-                    "raw": resp
-                }
-            except:
-                pass
+        # Helper to attempt parsing numeric lists from strings
+        def _parse_any(raw):
+            # direct XYXY list
+            if isinstance(raw, (list, tuple)) and len(raw) >= 4:
+                return [int(float(v)) for v in raw[:4]]
+            # if a list of 2 -> point
+            if isinstance(raw, (list, tuple)) and len(raw) == 2:
+                return [int(float(raw[0])), int(float(raw[1]))]
+            # dict with x,y or x1,y1,x2,y2
+            if isinstance(raw, dict):
+                # try multiple keys
+                for kset in (("x1","y1","x2","y2"), ("x","y"), ("left","top","right","bottom")):
+                    if all(k in raw for k in kset):
+                        vals = [int(float(raw[k])) for k in kset if k in raw]
+                        return vals
+            # string attempts
+            if isinstance(raw, str):
+                # try to find numbers: two or four
+                m = re.findall(r"-?\d{1,6}", raw)
+                if len(m) >= 4:
+                    return [int(m[0]), int(m[1]), int(m[2]), int(m[3])]
+                if len(m) >= 2:
+                    return [int(m[0]), int(m[1])]
+            return None
 
-        # -------------------------------
-        # 2) Fallback: try to parse ANY format
-        # -------------------------------
-        parsed_point = _parse_position_raw(raw_xyxy)
+        parsed = _parse_any(raw_response)
 
-        if parsed_point:
-            parsed_point = normalize_coordinates(parsed_point, image_path)
+        # 1) xyxy -> bbox
+        if parsed and len(parsed) >= 4:
+            x1, y1, x2, y2 = parsed[:4]
+            left = min(x1, x2); top = min(y1, y2); right = max(x1, x2); bottom = max(y1, y2)
+            w = max(1, right - left); h = max(1, bottom - top)
+            bbox = [left, top, w, h]
+            # normalize to image
+            nx, ny = normalize_coordinates([left, top], image_path)
+            bbox[0] = nx; bbox[1] = ny
+            return {"bbox": bbox, "point": [nx + w//2, ny + h//2], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "bbox"}
 
-            px, py = parsed_point
-            # tiny fallback bbox
-            return {
-                "bbox": [px - 10, py - 10, 20, 20],
-                "raw": resp
-            }
+        # 2) point -> tiny bbox
+        if parsed and len(parsed) == 2:
+            px, py = parsed
+            px, py = normalize_coordinates([px, py], image_path)
+            bbox = [max(0, px - 12), max(0, py - 12), 24, 24]
+            return {"bbox": bbox, "point": [px, py], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "point"}
 
-        # -------------------------------
-        # 3) Total failure
-        # -------------------------------
-        logger.warning("OSAtlasAdapter: invalid bbox response: %s", raw_xyxy)
-        return {"bbox": None, "raw": resp}
+        # 3) try legacy 'raw_output' text extraction: look for <|box_start|> token pattern
+        if isinstance(raw_response, str) and "<|box_start|" in raw_response:
+            m = re.search(r"<\|box_start\|>(.*?)<\|box_end\|>", raw_response, re.S)
+            if m:
+                inner = m.group(1)
+                parsed2 = _parse_any(inner)
+                if parsed2:
+                    if len(parsed2) >= 4:
+                        x1, y1, x2, y2 = parsed2[:4]
+                        left = min(x1, x2); top = min(y1, y2)
+                        w = max(1, abs(x2 - x1)); h = max(1, abs(y2 - y1))
+                        bbox = [left, top, w, h]
+                        bbox[0], bbox[1] = normalize_coordinates([bbox[0], bbox[1]], image_path)
+                        return {"bbox": bbox, "point": [bbox[0] + w//2, bbox[1] + h//2], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "bbox"}
+
+        # 4) give warning + best-effort center fallback (image center)
+        try:
+            img = Image.open(image_path)
+            W, H = img.size
+            cx, cy = W//2, H//2
+            bbox = [cx - 50, cy - 50, 100, 100]
+            bbox[0], bbox[1] = normalize_coordinates([bbox[0], bbox[1]], image_path)
+            logger.warning("OSAtlasAdapter: could not parse response; returning center fallback. raw_response=%s", raw_response)
+            return {"bbox": bbox, "point": [cx, cy], "confidence": 0.0, "raw": resp, "type": "fallback_center"}
+        except Exception:
+            return {"bbox": None, "point": None, "confidence": 0.0, "raw": resp, "type": "none"}
+
 
     # ---------------------------------------------------------
     # You said KEEP BUSINESS LOGIC → DO NOT REMOVE
