@@ -158,97 +158,115 @@ class OSAtlasAdapter(BaseAdapter):
                 try: f.close()
                 except: pass
 
+    
     # ---------------------------------------------------------
-    # MAIN DETECT LOGIC (IMPROVED)
-    # ---------------------------------------------------------
-        # ---------------------------------------------------------
-    # MAIN DETECT LOGIC (IMPROVED)
+    # MAIN DETECT LOGIC (IMPROVED, NO REFERENCE REPO CODE)
     # ---------------------------------------------------------
     def detect(self, step: Dict[str, Any]) -> Dict[str, Any]:
         image_path = step.get("image_path")
-        text = (step.get("text", step.get("description", "")) or "").strip()
+        text_query = (step.get("text", step.get("description", "")) or "").strip()
 
-        # Guard
         if not image_path or not os.path.exists(image_path):
             logger.warning("OSAtlasAdapter.detect: missing image_path %s", image_path)
-            return {"bbox": None, "point": None, "confidence": 0.0, "raw": {}, "type": "none"}
+            return {
+                "bbox": None, "point": None, "confidence": 0.0,
+                "raw": {}, "type": "none"
+            }
 
-        resp = self._call_predict(image_path, text)
+        # ------------------------------------------
+        # 1) CALL OS-ATLAS
+        # ------------------------------------------
+        resp = self._call_predict(image_path, text_query)
+        raw_response = (
+            resp.get("response")
+            or resp.get("bbox")
+            or resp.get("raw_output")
+            or resp.get("predictions")
+            or resp.get("result")
+            or resp
+        )
 
-        # model may return many shapes: try common keys first
-        raw_response = resp.get("response") or resp.get("bbox") or resp.get("raw_output") or resp.get("predictions") or resp.get("result") or resp
-
-        # Helper to attempt parsing numeric lists from strings
-        def _parse_any(raw):
-            # direct XYXY list
+        # helper to parse xyxy or point
+        def _parse_xyxy(raw):
             if isinstance(raw, (list, tuple)) and len(raw) >= 4:
-                return [int(float(v)) for v in raw[:4]]
-            # if a list of 2 -> point
-            if isinstance(raw, (list, tuple)) and len(raw) == 2:
-                return [int(float(raw[0])), int(float(raw[1]))]
-            # dict with x,y or x1,y1,x2,y2
+                return [float(v) for v in raw[:4]]
             if isinstance(raw, dict):
-                # try multiple keys
-                for kset in (("x1","y1","x2","y2"), ("x","y"), ("left","top","right","bottom")):
+                for kset in (("x1","y1","x2","y2"),("left","top","right","bottom")):
                     if all(k in raw for k in kset):
-                        vals = [int(float(raw[k])) for k in kset if k in raw]
-                        return vals
-            # string attempts
+                        return [float(raw[k]) for k in kset]
             if isinstance(raw, str):
-                # try to find numbers: two or four
-                m = re.findall(r"-?\d{1,6}", raw)
-                if len(m) >= 4:
-                    return [int(m[0]), int(m[1]), int(m[2]), int(m[3])]
-                if len(m) >= 2:
-                    return [int(m[0]), int(m[1])]
+                nums = re.findall(r"-?\d{1,6}", raw)
+                if len(nums) >= 4:
+                    return [float(nums[0]), float(nums[1]), float(nums[2]), float(nums[3])]
             return None
 
-        parsed = _parse_any(raw_response)
+        xyxy = _parse_xyxy(raw_response)
+        conf = float(resp.get("confidence", 0.0))
 
-        # 1) xyxy -> bbox
-        if parsed and len(parsed) >= 4:
-            x1, y1, x2, y2 = parsed[:4]
-            left = min(x1, x2); top = min(y1, y2); right = max(x1, x2); bottom = max(y1, y2)
-            w = max(1, right - left); h = max(1, bottom - top)
-            bbox = [left, top, w, h]
-            # normalize to image
-            nx, ny = normalize_coordinates([left, top], image_path)
-            bbox[0] = nx; bbox[1] = ny
-            return {"bbox": bbox, "point": [nx + w//2, ny + h//2], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "bbox"}
+        # ------------------------------------------
+        # 2) OSATLAS valid result
+        # ------------------------------------------
+        if xyxy and conf >= 0.42:
+            x1, y1, x2, y2 = xyxy
+            left, top = min(x1, x2), min(y1, y2)
+            w, h = abs(x2 - x1), abs(y2 - y1)
+            left, top = normalize_coordinates([left, top], image_path)
 
-        # 2) point -> tiny bbox
-        if parsed and len(parsed) == 2:
-            px, py = parsed
-            px, py = normalize_coordinates([px, py], image_path)
-            bbox = [max(0, px - 12), max(0, py - 12), 24, 24]
-            return {"bbox": bbox, "point": [px, py], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "point"}
+            bbox = [int(left), int(top), int(max(1, w)), int(max(1, h))]
+            return {
+                "bbox": bbox,
+                "point": [bbox[0] + bbox[2] // 2, bbox[1] + bbox[3] // 2],
+                "confidence": conf,
+                "raw": resp,
+                "type": "osatlas_bbox"
+            }
 
-        # 3) try legacy 'raw_output' text extraction: look for <|box_start|> token pattern
-        if isinstance(raw_response, str) and "<|box_start|" in raw_response:
-            m = re.search(r"<\|box_start\|>(.*?)<\|box_end\|>", raw_response, re.S)
-            if m:
-                inner = m.group(1)
-                parsed2 = _parse_any(inner)
-                if parsed2:
-                    if len(parsed2) >= 4:
-                        x1, y1, x2, y2 = parsed2[:4]
-                        left = min(x1, x2); top = min(y1, y2)
-                        w = max(1, abs(x2 - x1)); h = max(1, abs(y2 - y1))
-                        bbox = [left, top, w, h]
-                        bbox[0], bbox[1] = normalize_coordinates([bbox[0], bbox[1]], image_path)
-                        return {"bbox": bbox, "point": [bbox[0] + w//2, bbox[1] + h//2], "confidence": float(resp.get("confidence", 1.0)), "raw": resp, "type": "bbox"}
-
-        # 4) give warning + best-effort center fallback (image center)
+        # ------------------------------------------
+        # 3) FALLBACK: TEXT-BASED OCR SEARCH
+        # (your architecture already uses OCR in validator)
+        # ------------------------------------------
         try:
-            img = Image.open(image_path)
-            W, H = img.size
-            cx, cy = W//2, H//2
-            bbox = [cx - 50, cy - 50, 100, 100]
-            bbox[0], bbox[1] = normalize_coordinates([bbox[0], bbox[1]], image_path)
-            logger.warning("OSAtlasAdapter: could not parse response; returning center fallback. raw_response=%s", raw_response)
-            return {"bbox": bbox, "point": [cx, cy], "confidence": 0.0, "raw": resp, "type": "fallback_center"}
-        except Exception:
-            return {"bbox": None, "point": None, "confidence": 0.0, "raw": resp, "type": "none"}
+            from os_automation.tools.ocr import simple_ocr
+            ocr_text, word_boxes = simple_ocr(image_path)
+        except:
+            ocr_text, word_boxes = ("", [])
+
+        # try match query inside OCR-words
+        if text_query and word_boxes:
+            matches = [
+                box for (word, box) in word_boxes
+                if text_query.lower() in word.lower()
+            ]
+            if matches:
+                # use first match
+                x, y, w, h = matches[0]
+                return {
+                    "bbox": [x, y, w, h],
+                    "point": [x + w//2, y + h//2],
+                    "confidence": 0.30,
+                    "raw": resp,
+                    "type": "ocr_text_match"
+                }
+
+        # ------------------------------------------
+        # 4) FINAL FALLBACK → CENTER OF SCREEN
+        # ------------------------------------------
+        from PIL import Image
+        img = Image.open(image_path)
+        W, H = img.size
+        cx, cy = W//2, H//2
+        bbox = [cx - 40, cy - 40, 80, 80]
+
+        logger.warning("OSAtlasAdapter: fallback to center for query '%s'", text_query)
+
+        return {
+            "bbox": bbox,
+            "point": [cx, cy],
+            "confidence": 0.0,
+            "raw": resp,
+            "type": "center_fallback"
+        }
+
 
 
     # ---------------------------------------------------------

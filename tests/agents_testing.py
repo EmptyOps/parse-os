@@ -18,9 +18,11 @@ def main():
 
     # 2️⃣ Pass screenshot to OSAtlas + main agent
     result = orch.run(
-        "Open the browser, go to search bar and Search for 'open source automation' into Google and press Enter",
-        #"Click on 'File' menu in VS Code bbox and scroll up",
-        # "Open Terminal and list out the files",
+        # "Open the browser, go to search bar and Search for 'open source automation' into Google and press Enter",
+        # "Click on 'File' menu in VS Code bbox and scroll up",
+        "Open Terminal and list out the files",
+        # "Open browser and search Python tutorial",
+        # "Search youtube in browser and open first link",Click 'File' menu in VS Code
 
         image_path=screenshot_path
     )

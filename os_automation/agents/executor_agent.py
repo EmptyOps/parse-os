@@ -6,12 +6,16 @@ import uuid
 import yaml
 import logging
 import random
+import yaml
 from typing import Optional, Dict, Any, List
 
 from PIL import Image
 import pyautogui
 
 import platform, subprocess, webbrowser
+
+from os_automation.agents.validator_agent import ValidatorAgent
+
 
 from os_automation.core.registry import registry
 from os_automation.repos.osatlas_adapter import (
@@ -55,6 +59,10 @@ class ExecutorAgent:
         chrome_preference: bool = True,
         output_dir: str = None
     ):
+        
+        self.validator = ValidatorAgent()
+
+        
         self.default_detection = default_detection
         self.default_executor = default_executor
         self.openai_model = openai_model
@@ -158,6 +166,29 @@ class ExecutorAgent:
             for fn in ("detect", "call", "run", "predict", "infer"):
                 if hasattr(det, fn):
                     try:
+                        # ==========================================================
+                        # 🔥 LLM-enhanced query normalization for OSAtlas
+                        # ==========================================================
+                        try:
+                            from os_automation.agents.main_ai import MainAIAgent
+                            ma = MainAIAgent()
+
+                            llm_target = ma.decide_event_llm(
+                                description=description,
+                                bbox=None,
+                                image_path=shot
+                            )
+
+                            # if LLM provides focus target or query
+                            if isinstance(llm_target, dict):
+                                if "focus_target" in llm_target:
+                                    description = llm_target["focus_target"]
+                                elif "query" in llm_target:
+                                    description = llm_target["query"]
+
+                        except Exception as e:
+                            logger.debug("LLM target normalization failed: %s", e)
+
                         res = getattr(det, fn)({"image_path": shot, "text": description})
                         if isinstance(res, dict) and "bbox" in res:
                             bx = res["bbox"]
@@ -187,10 +218,8 @@ class ExecutorAgent:
         return None
 
 
+    
     # ====================================================================
-    # DECISION: click / type / enter
-    # ====================================================================
-        # ====================================================================
     # DECISION: Fully patched event mapping (supports 15+ actions)
     # ====================================================================
     def _decide_event(self, description: str) -> Dict[str, Any]:
@@ -291,8 +320,17 @@ class ExecutorAgent:
         # -----------------------------------------------------------
         # FALLBACK → NORMAL CLICK
         # -----------------------------------------------------------
-        if "click" in desc:
-            return {"event": "click"}
+        # 🔥 SPECIAL CASE — GOOGLE SEARCH FIELD
+        if desc in ("click search box", "search box", "click search", "search"):
+            return {"event": "click_google_search"}
+        
+        # -----------------------------------------------------------
+        # WAIT / NO-OP
+        # -----------------------------------------------------------
+        # near other fallbacks
+        if "wait" in desc or "pause" in desc or desc in ("noop", "no-op"):
+            return {"event": "noop"}
+
 
         # -----------------------------------------------------------
         # FINAL FALLBACK → type raw text
@@ -323,6 +361,17 @@ class ExecutorAgent:
         y = int(bbox[1] + bbox[3] / 2)
 
         try:
+            
+            if decision.get("event") == "click_google_search":
+                width, height = pyautogui.size()
+                x = width // 2
+                y = int(height * 0.40)   # consistent click on Google search field
+                self._safe_click_xy(x, y)
+                time.sleep(0.7)
+                after = _screenshot(self.output_dir, "after")
+                return {"status": "success", "before": before, "after": after}
+
+            
             event = decision.get("event")
 
             # CLICK
@@ -370,6 +419,11 @@ class ExecutorAgent:
                 direction = decision["direction"]
                 pyautogui.moveTo(x, y)
                 pyautogui.scroll(300 if direction == "up" else -300)
+                
+            # NO-OP / WAIT
+            elif event == "noop":
+                time.sleep(1)
+
 
             else:
                 raise ValueError(f"Unknown event: {event}")
@@ -539,11 +593,37 @@ class ExecutorAgent:
                     exec_result = {"status": "failed", "error": str(e), "before": shot, "after": _screenshot(self.output_dir, "after")}
 
                 # Validate
+                # -------------------------------------------------------
+                # VALIDATION PIPELINE (dual-phase: simple + advanced)
+                # -------------------------------------------------------
+
                 exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
-                validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-                validation = yaml.safe_load(validation_yaml)
-                last_execution = exec_result
-                last_validation = validation
+
+                # 1) OLD YAML validator
+                yaml_validation = validator_agent.validate_step_yaml(exec_yaml)
+                yaml_val_data = yaml.safe_load(yaml_validation)
+
+
+                # 2) ADVANCED VALIDATION (pixel, OCR, region diff)
+                adv_validation = validator_agent.validate_step_advanced(
+                    description=description,
+                    before_path=exec_result.get("before"),
+                    after_path=exec_result.get("after"),
+                    bbox=bbox or [0, 0, 80, 80]
+                )
+
+                # 3) SELECT THE SAFER / MORE CONFIDENT RESULT
+                if adv_validation.get("valid"):
+                    validation = {
+                        "validation_status": "pass",
+                        "details": adv_validation
+                    }
+                else:
+                    validation = {
+                        "validation_status": yaml_val_data.get("validation_status", "fail"),
+                        "details": yaml_val_data.get("details", {})
+                    }
+
 
                 if validation.get("validation_status") == "pass":
                     return yaml.safe_dump({"execution": {"attempts": attempt, "last": last_execution}, "validation": last_validation, "escalate": False}, sort_keys=False)
@@ -588,7 +668,7 @@ class ExecutorAgent:
                         exec_result = {"status": "success" if adapter_result else "failed", "raw": adapter_result, "before": shot, "after": _screenshot(self.output_dir, "after")}
                 else:
                     # use internal _perform -> requires bbox (fallback to tiny bbox if none)
-                    use_bbox = bbox or [10, 10, 20, 20]
+                    use_bbox = bbox or [10, 10, 80, 80]
                     exec_result = {**self._perform(use_bbox, decision), "bbox": bbox, "decision": decision}
             except Exception as e:
                 exec_result = {"status": "failed", "error": str(e), "before": shot, "after": _screenshot(self.output_dir, "after")}
@@ -872,12 +952,53 @@ class ExecutorAgent:
 
             if not bbox:
                 before = _screenshot(self.output_dir, "before")
+                # no bbox -> fallback behaviour (press enter to try navigation) — keep legacy behavior
                 pyautogui.press("enter")
                 time.sleep(0.6)
                 after = _screenshot(self.output_dir, "after")
                 exec_result = {"status": "no_bbox", "before": before, "after": after, "bbox": None}
             else:
-                decision = self._decide_event(description)
+                # ----------------------------------------------------
+                # 🔥 1) First ask LLM to pick best event + target
+                # ----------------------------------------------------
+                llm_decision = None
+                try:
+                    from os_automation.agents.main_ai import MainAIAgent
+                    ma = MainAIAgent()
+                    llm_decision = ma.decide_event_llm(
+                        description=description,
+                        bbox=bbox,
+                        image_path=shot
+                    )
+                except Exception as e:
+                    logger.debug("LLM event decision failed: %s", e)
+
+                # ----------------------------------------------------
+                # 🔥 2) If LLM gives a valid event → use it
+                # ----------------------------------------------------
+                if llm_decision and llm_decision.get("event") and llm_decision.get("event") != "unknown":
+                    decision = llm_decision
+                else:
+                    # ------------------------------------------------
+                    # 🔥 3) Fallback to local deterministic mapping
+                    # ------------------------------------------------
+                    decision = self._decide_event(description)
+
+                # optional small ambiguity fixer (kept)
+                try:
+                    ambiguous = False
+                    desc_low = description.lower()
+                    if decision.get("event") in ("type", "unknown") and "click" in desc_low:
+                        ambiguous = True
+
+                    if ambiguous:
+                        llm_choice = ma.decide_event_llm(description=description, bbox=bbox, image_path=shot)
+                        if llm_choice and llm_choice.get("event") not in ("unknown", None):
+                            decision = llm_choice
+
+                except Exception as e:
+                    logger.debug("Second LLM disambiguation failed: %s", e)
+
                 exec_result = {**self._perform(bbox, decision), "bbox": bbox, "decision": decision}
 
             exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
@@ -905,17 +1026,47 @@ class ExecutorAgent:
 
 
     # ====================================================================
-    # BACKWARDS COMPATIBILITY FOR ORCHESTRATOR
+    # BACKWARDS + FORWARD COMPATIBLE run_step()
     # ====================================================================
-    def run_step(self, step_description: str, validator_agent, max_attempts: int = 3) -> Dict[str, Any]:
-        step_payload = {"step_id": 0, "description": step_description}
-        step_yaml = yaml.safe_dump(step_payload, sort_keys=False)
-        result_yaml = self.run_step_yaml(step_yaml, validator_agent, max_attempts)
+    def run_step(self, step=None, step_id=None, step_description=None, validator_agent=None, max_attempts=1, **kwargs):
+        """
+        Supports both:
+            run_step(step=<dict>)
+        AND
+            run_step(step_id=1, step_description="Click search box")
+
+        This is required because Orchestrator now calls:
+            run_step(step_description=..., validator_agent=..., max_attempts=...)
+        """
+        
+        # --------------------------
+        # Normalize to a step dict
+        # --------------------------
+        if step is None:
+            step = {
+                "step_id": step_id,
+                "description": step_description
+            }
+
+        if "description" not in step or step["description"] is None:
+            raise ValueError("run_step(): 'description' missing from step")
+
+        if "step_id" not in step or step["step_id"] is None:
+            step["step_id"] = step_id or 1
+
+         # ---- Execute via modern YAML pipeline ----
+        yaml_result = self.run_step_yaml(
+            yaml.safe_dump(step),
+            validator_agent=validator_agent or self.validator,
+            max_attempts=max_attempts
+        )
+
+        # ---- Convert YAML → Python dict ----
         try:
-            return yaml.safe_load(result_yaml)
-        except:
+            return yaml.safe_load(yaml_result)
+        except Exception:
             return {
-                "execution": {"attempts": 0, "last": None},
-                "validation": {"validation_status": "unknown"},
-                "escalate": True
+                "execution": None,
+                "validation": {"validation_status": "fail", "reason": "invalid_yaml"},
+                "raw": yaml_result
             }

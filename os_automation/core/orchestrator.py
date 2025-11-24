@@ -372,18 +372,25 @@ class Orchestrator:
             for step in planned_steps:
                 print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
 
-                # SANITY: If the planner micro-fallback inserted "open browser" but the user prompt
-                # is clearly a terminal/file command, remove that step.
-                prompt_low = (user_prompt or "").lower()
-                if step.description.lower() == "open browser" and any(k in prompt_low for k in ["terminal", "ls", "pwd", "cd ", "list files", "list out the files", "open terminal"]):
-                    print("[Orchestrator] Removing spurious 'open browser' step because prompt looks terminal-like.")
-                    # skip it
-                    final_step_reports.append({
-                        "step": step.dict(),
-                        "execution": None,
-                        "validation": {"validation_status": "skipped", "reason": "planner_browser_bias_removed"}
-                    })
-                    continue
+                # -----------------------------
+                # FIX 5 — Prevent accidental browser opening
+                # -----------------------------
+                prompt_low = (user_prompt or "").lower().strip()
+                desc_low = step.description.lower().strip()
+
+                if desc_low in ("open browser", "open the browser", "open chrome", "open google chrome"):
+                    if any(k in prompt_low for k in ["terminal", "ls", "pwd", "cd ", "list files", "list out the files", "open terminal"]):
+                        print("[Orchestrator] Removing incorrect 'open browser' step due to terminal intent.")
+                        final_step_reports.append({
+                            "step": step.dict(),
+                            "execution": None,
+                            "validation": {
+                                "validation_status": "skipped",
+                                "reason": "browser_step_removed_terminal_intent"
+                            }
+                        })
+                        continue
+
 
                 step_result = self.executor_agent.run_step(
                     step_description=step.description,
