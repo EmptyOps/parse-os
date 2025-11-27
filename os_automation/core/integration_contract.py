@@ -17,3 +17,4 @@ class IntegrationContract(BaseModel):
     capabilities: List[str] = ["detect", "execute", "validate"]
     dependencies: Optional[List[str]] = None
     config_options: Optional[Dict[str, Any]] = None
+

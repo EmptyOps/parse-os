@@ -395,7 +395,7 @@ class Orchestrator:
                 step_result = self.executor_agent.run_step(
                     step_description=step.description,
                     validator_agent=self.validator_agent,
-                    max_attempts=1  # we handle retries via replan loop below
+                    max_attempts=3  # we handle retries via replan loop below
                 )
 
                 validation_status = step_result.get("validation", {}).get("validation_status")

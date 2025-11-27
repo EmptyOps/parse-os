@@ -1,5 +1,4 @@
-#os_automation/agents/executor_agent.py
-
+# os_automation/agents/executor_agent.py
 import os
 import time
 import uuid
@@ -25,6 +24,9 @@ from os_automation.repos.osatlas_adapter import (
 
 logger = logging.getLogger(__name__)
 pyautogui.FAILSAFE = True
+
+# Default attempts: retry 3 times, on 4th -> replan
+DEFAULT_MAX_ATTEMPTS = 4
 
 
 # -------------------------------------------------------
@@ -57,16 +59,19 @@ class ExecutorAgent:
         default_executor: str = "pyautogui",
         openai_model: str = "gpt-4",
         chrome_preference: bool = True,
-        output_dir: str = None
+        output_dir: str = None,
+        max_attempts: int = DEFAULT_MAX_ATTEMPTS
     ):
         
         self.validator = ValidatorAgent()
 
-        
         self.default_detection = default_detection
         self.default_executor = default_executor
         self.openai_model = openai_model
         self.chrome_preference = chrome_preference
+
+        # Number of attempts before escalation/replan (default 4: 3 retries then replan)
+        self.max_attempts = int(max_attempts)
 
         self.output_dir = output_dir or os.path.join(os.getcwd(), "os_automation_output")
         os.makedirs(self.output_dir, exist_ok=True)
@@ -133,6 +138,22 @@ class ExecutorAgent:
     # ====================================================================
     def _detect_bbox(self, description: str, image_path: Optional[str] = None) -> Optional[List[int]]:
         
+        
+        # -----------------------------------------------------------
+        # LLM REWRITE: Convert description → ideal OSAtlas keyword
+        # -----------------------------------------------------------
+        try:
+            from os_automation.agents.main_ai import MainAIAgent
+            ma = MainAIAgent()
+
+            rewritten = ma.rewrite_ui_query(description)
+            if rewritten:
+                description = rewritten
+
+        except Exception as e:
+            logger.debug(f"LLM rewrite failed: {e}")
+
+        
         # 🔥 Smart browser element text remapping for OSAtlas
         alias = {
             "click search box": "search",
@@ -148,6 +169,9 @@ class ExecutorAgent:
             "url bar": "address bar",
             "omnibox": "address bar",
             "click url": "address bar",
+            "click on the youtube link": "YouTube",
+            "youtube link": "YouTube",
+            "first youtube link": "YouTube",
         }
 
         for k, v in alias.items():
@@ -441,7 +465,7 @@ class ExecutorAgent:
     # ----------------------------------------------------------------
     # NEW: YAML-driven action executor (uses OSAtlas for detection, PyAutoGUI adapter for events)
     # ----------------------------------------------------------------
-    def run_action_yaml(self, action_yaml: str, validator_agent, original_prompt: str = "", max_attempts: int = 4) -> str:
+    def run_action_yaml(self, action_yaml: str, validator_agent, original_prompt: str = "", max_attempts: int = None) -> str:
         """
         Input YAML (string):
         execute:
@@ -462,6 +486,8 @@ class ExecutorAgent:
         import json
         from os_automation.core.registry import registry
         from os_automation.agents.main_ai import MainAIAgent
+
+        max_attempts = max_attempts or self.max_attempts
 
         try:
             payload = yaml.safe_load(action_yaml) or {}
@@ -630,12 +656,24 @@ class ExecutorAgent:
                 else:
                     # failed -> continue loop or escalate if last attempt
                     if attempt >= max_attempts:
-                        # trigger replan
+                        # trigger replan (use safe original_prompt variable)
                         failed_step_yaml = yaml.safe_dump({"step": step}, sort_keys=False)
                         failure_details_yaml = yaml.safe_dump({"execution": last_execution, "validation": last_validation}, sort_keys=False)
                         ma = MainAIAgent()
-                        replan_yaml = ma.replan_on_failure(original_prompt or description, failed_step_yaml, failure_details_yaml)
-                        return yaml.safe_dump({"execution": {"attempts": attempt, "last": last_execution}, "validation": last_validation, "escalate": True, "replan": yaml.safe_load(replan_yaml)}, sort_keys=False)
+                        # ensure original_prompt is safely referenced
+                        oprompt = original_prompt if ('original_prompt' in locals() and original_prompt) else description
+                        try:
+                            replan_yaml = ma.replan_on_failure(oprompt, failed_step_yaml, failure_details_yaml)
+                            replan_parsed = yaml.safe_load(replan_yaml)
+                        except Exception as e:
+                            replan_parsed = {"escalation": {"reason": "replan_failed_parse", "error": str(e), "raw": replan_yaml if 'replan_yaml' in locals() else None}}
+                        return yaml.safe_dump({
+                            "execution": {"attempts": attempt, "last": last_execution},
+                            "validation": last_validation,
+                            "escalate": True,
+                            "replan": replan_parsed
+                        }, sort_keys=False)
+
                     else:
                         time.sleep(0.6)
                         continue
@@ -690,6 +728,7 @@ class ExecutorAgent:
                 }, sort_keys=False)
 
             # If failed and we've reached the max attempts -> trigger replan
+            logger.debug("Action attempt %d failed validation: %s", attempt, validation)
             if attempt >= max_attempts:
                 failed_step_yaml = yaml.safe_dump({"step": step}, sort_keys=False)
                 failure_details_yaml = yaml.safe_dump({"execution": last_execution, "validation": last_validation}, sort_keys=False)
@@ -702,6 +741,7 @@ class ExecutorAgent:
                 except Exception:
                     replan_parsed = {"escalation": {"reason": "replan_failed_parse", "raw": replan_yaml}}
 
+                logger.warning("Action escalated to planner after %d attempts for: %s", attempt, description)
                 return yaml.safe_dump({
                     "execution": {"attempts": attempt, "last": last_execution},
                     "validation": last_validation,
@@ -724,7 +764,9 @@ class ExecutorAgent:
     # ====================================================================
     # MAIN YAML EXECUTOR
     # ====================================================================
-    def run_step_yaml(self, step_yaml: str, validator_agent, max_attempts: int = 3) -> str:
+    def run_step_yaml(self, step_yaml: str, validator_agent, max_attempts=None, original_prompt=None) -> str:
+
+        max_attempts = max_attempts or self.max_attempts
 
         step = yaml.safe_load(step_yaml)
         description = step.get("description")
@@ -952,54 +994,68 @@ class ExecutorAgent:
 
             if not bbox:
                 before = _screenshot(self.output_dir, "before")
-                # no bbox -> fallback behaviour (press enter to try navigation) — keep legacy behavior
+                logger.warning("No bbox found for step '%s' — falling back to press Enter (legacy behavior).", description)
                 pyautogui.press("enter")
                 time.sleep(0.6)
                 after = _screenshot(self.output_dir, "after")
                 exec_result = {"status": "no_bbox", "before": before, "after": after, "bbox": None}
+
             else:
                 # ----------------------------------------------------
-                # 🔥 1) First ask LLM to pick best event + target
+                # 🔥 1) Ask LLM to choose BEST event for this bbox
                 # ----------------------------------------------------
                 llm_decision = None
                 try:
                     from os_automation.agents.main_ai import MainAIAgent
                     ma = MainAIAgent()
+
                     llm_decision = ma.decide_event_llm(
                         description=description,
                         bbox=bbox,
                         image_path=shot
                     )
-                except Exception as e:
-                    logger.debug("LLM event decision failed: %s", e)
 
+                except Exception as e:
+                    logger.debug(f"LLM decision failed: {e}")
                 # ----------------------------------------------------
-                # 🔥 2) If LLM gives a valid event → use it
+                # 🔥 2) If LLM gives valid event → USE IT
                 # ----------------------------------------------------
-                if llm_decision and llm_decision.get("event") and llm_decision.get("event") != "unknown":
+                if (
+                    isinstance(llm_decision, dict)
+                    and llm_decision.get("event")
+                    and llm_decision.get("event") != "unknown"
+                ):
                     decision = llm_decision
+
                 else:
                     # ------------------------------------------------
-                    # 🔥 3) Fallback to local deterministic mapping
+                    # 🔥 3) fallback → deterministic mapping
                     # ------------------------------------------------
                     decision = self._decide_event(description)
 
-                # optional small ambiguity fixer (kept)
+                # ----------------------------------------------------
+                # 🔥 4) Optional second disambiguation
+                # ----------------------------------------------------
                 try:
                     ambiguous = False
-                    desc_low = description.lower()
-                    if decision.get("event") in ("type", "unknown") and "click" in desc_low:
+                    dl = description.lower()
+                    if decision.get("event") in ("type", "unknown") and "click" in dl:
                         ambiguous = True
-
                     if ambiguous:
-                        llm_choice = ma.decide_event_llm(description=description, bbox=bbox, image_path=shot)
-                        if llm_choice and llm_choice.get("event") not in ("unknown", None):
-                            decision = llm_choice
+                        llm2 = ma.decide_event_llm(description=description, bbox=bbox, image_path=shot)
+                        if llm2 and llm2.get("event") not in ("unknown", None):
+                            decision = llm2
 
                 except Exception as e:
-                    logger.debug("Second LLM disambiguation failed: %s", e)
+                    logger.debug(f"LLM disambiguation failed: {e}")
 
-                exec_result = {**self._perform(bbox, decision), "bbox": bbox, "decision": decision}
+                # FINAL: perform using chosen event
+                exec_result = {
+                    **self._perform(bbox, decision),
+                    "bbox": bbox,
+                    "decision": decision
+                }
+
 
             exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
             validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
@@ -1015,6 +1071,31 @@ class ExecutorAgent:
                     "escalate": False
                 }, sort_keys=False)
 
+            logger.debug("Step attempt %d failed validation: %s", attempt, validation)
+
+            # If we've reached max_attempts -> replan via MainAIAgent
+            if attempt >= max_attempts:
+                failed_step_yaml = yaml.safe_dump({"step": step}, sort_keys=False)
+                failure_details_yaml = yaml.safe_dump({"execution": last_execution, "validation": last_validation}, sort_keys=False)
+                from os_automation.agents.main_ai import MainAIAgent
+                ma = MainAIAgent()
+                # ensure original_prompt is available and safe to use
+                oprompt = original_prompt if ('original_prompt' in locals() and original_prompt) else description
+                try:
+                    replan_yaml = ma.replan_on_failure(oprompt, failed_step_yaml, failure_details_yaml)
+                    replan_parsed = yaml.safe_load(replan_yaml)
+                except Exception as e:
+                    replan_parsed = {"escalation": {"reason": "replan_failed_parse", "error": str(e), "raw": replan_yaml if 'replan_yaml' in locals() else None}}
+
+                logger.warning("Step escalated to planner after %d attempts for: %s", attempt, description)
+                return yaml.safe_dump({
+                    "execution": {"attempts": attempt, "last": last_execution},
+                    "validation": last_validation,
+                    "escalate": True,
+                    "replan": replan_parsed
+                }, sort_keys=False)
+
+
             time.sleep(0.6)
 
         return yaml.safe_dump({
@@ -1028,7 +1109,11 @@ class ExecutorAgent:
     # ====================================================================
     # BACKWARDS + FORWARD COMPATIBLE run_step()
     # ====================================================================
-    def run_step(self, step=None, step_id=None, step_description=None, validator_agent=None, max_attempts=1, **kwargs):
+    # def run_step(self, step=None, step_id=None, step_description=None, validator_agent=None, max_attempts: int = None, **kwargs):
+        
+    def run_step(self, step=None, step_id=None, step_description=None,
+             validator_agent=None, max_attempts=None,
+             original_prompt=None, **kwargs):    
         """
         Supports both:
             run_step(step=<dict>)
@@ -1058,7 +1143,8 @@ class ExecutorAgent:
         yaml_result = self.run_step_yaml(
             yaml.safe_dump(step),
             validator_agent=validator_agent or self.validator,
-            max_attempts=max_attempts
+            max_attempts=(max_attempts or self.max_attempts),
+            original_prompt=original_prompt or step_description
         )
 
         # ---- Convert YAML → Python dict ----

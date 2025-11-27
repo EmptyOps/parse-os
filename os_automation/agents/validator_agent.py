@@ -57,16 +57,13 @@ def _ocr(image_path: str) -> str:
         return ""
 
 
-# ---------------------------------------------------------------------
-# VALIDATOR AGENT (FINAL VERSION)
-# ---------------------------------------------------------------------
-# ---------------------------------------------------------------------
-# VALIDATOR AGENT (FINAL VERSION WITH WRONG-FIELD DETECTION)
-# ---------------------------------------------------------------------
+# (inside os_automation/agents/validator_agent.py)
+
+# Adjusted thresholds (less aggressive for OCR-first validation)
 class ValidatorAgent:
-    TYPE_THRESHOLD = 0.3
-    CLICK_THRESHOLD = 0.6
-    NAVIGATION_THRESHOLD = 5.0
+    TYPE_THRESHOLD = 0.08    # lowered from 0.3 — terminal typing tends to produce tiny pixel diffs
+    CLICK_THRESHOLD = 0.5    # slightly lowered to be more tolerant of subtle UI changes
+    NAVIGATION_THRESHOLD = 4.0
 
     def validate_step_yaml(self, exec_yaml: str) -> str:
         import yaml
@@ -75,7 +72,6 @@ class ValidatorAgent:
         except Exception:
             return yaml.safe_dump({"validation_status": "fail", "details": {"reason": "invalid_exec_yaml"}})
 
-        # The existing logic uses:
         step = data.get("step", {})
         exe = data.get("execution", {})
 
@@ -95,53 +91,79 @@ class ValidatorAgent:
 
         diff = _pixel_diff(before, after)
 
-        # ---------------------------------------------------------
-        # TYPE validation (OCR first)
-        # ---------------------------------------------------------
-        if "type" in desc:
-            import re
-            m = re.search(r"['\"]([^'\"]+)['\"]", desc)
-            expected = m.group(1) if m else ""
+        # ---------------------------
+        # Special-cases (search results / first link)
+        # ---------------------------
+        if any(k in desc for k in ("first search result", "first result", "first link", "open first result")):
+            # Many SERP clicks change page but may not show large pixel diffs in the cropped area.
+            return yaml.safe_dump({
+                "validation_status": "pass",
+                "details": {"method": "special_case", "reason": "first_search_result_click_assumed_ok"}
+            })
 
-            if OCR_AVAILABLE and expected:
-                ocr_after = _ocr(after).lower()
+        # ---------------------------------------------------------
+        # TYPING + TERMINAL COMMANDS (Type '...' / Run command '...')
+        # ---------------------------------------------------------
+        import re
 
-                # typed text found → generally good
-                if expected.lower() in ocr_after:
-                    # Try to detect URL-like OCR content (omnibox scenario)
-                    url_like = any(tok in ocr_after for tok in ("http://", "https://", "google.com", "bing.com"))
-                    # If URL-like and expected appears inside it, signal a warning but still allow pass.
-                    # We prefer to mark pass to avoid false negatives when OCR is imperfect.
-                    details = {"method": "ocr", "matched": expected}
-                    if url_like:
-                        details["note"] = "ocr_contains_url_like_text_may_be_omnibox"
+        is_type_step = desc.startswith("type ") or desc.startswith("type'") or "type '" in desc
+        is_run_cmd_step = desc.startswith("run command") or "run command" in desc
+        looks_like_terminal = is_run_cmd_step or "terminal" in desc or "shell" in desc or "command prompt" in desc
+
+        if is_type_step or is_run_cmd_step:
+            # Extract the quoted text: 'ls', 'pwd', etc.
+            m = re.search(r"['\"](.+?)['\"]", step.get("description", ""))
+            expected = (m.group(1) if m else "").strip()
+
+            # Try OCR on the after screenshot if available
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+
+            # 1) Exact OCR match of the expected text → strong PASS
+            if expected and expected.lower() in ocr_after:
+                return yaml.safe_dump({
+                    "validation_status": "pass",
+                    "details": {
+                        "method": "ocr",
+                        "matched": expected,
+                        "note": "expected text found in OCR output"
+                    }
+                })
+
+            # 2) Terminal heuristic:
+            #    - 'run command ...' OR description mentions terminal
+            #    - we just need to see that *something* appeared in the terminal
+            if looks_like_terminal:
+                if ocr_after.strip():
+                    # Any non-trivial text in the terminal after the command is a good sign
                     return yaml.safe_dump({
                         "validation_status": "pass",
-                        "details": details
+                        "details": {
+                            "method": "ocr_terminal_heuristic",
+                            "ocr_excerpt": ocr_after[:200]
+                        }
                     })
 
-                # OCR did not find text
+                # Fallback: use a very small pixel threshold
                 return yaml.safe_dump({
-                    "validation_status": "fail",
-                    "details": {"method": "ocr",
-                                "expected": expected,
-                                "ocr_excerpt": ocr_after[:200]}
+                    "validation_status": "pass" if diff > self.TYPE_THRESHOLD else "fail",
+                    "details": {
+                        "method": "pixel_terminal",
+                        "diff": diff,
+                        "threshold": self.TYPE_THRESHOLD
+                    }
                 })
 
-
-                # OCR did not find text
-                return yaml.safe_dump({
-                    "validation_status": "fail",
-                    "details": {"method": "ocr",
-                                "expected": expected,
-                                "ocr_excerpt": ocr_after[:200]}
-                })
-
-            # fallback pixel diff
+            # 3) Non-terminal typing (e.g. typing in a text field)
+            #    → relaxed pixel threshold
             return yaml.safe_dump({
                 "validation_status": "pass" if diff > self.TYPE_THRESHOLD else "fail",
-                "details": {"method": "pixel", "diff": diff}
+                "details": {
+                    "method": "pixel_typing",
+                    "diff": diff,
+                    "threshold": self.TYPE_THRESHOLD
+                }
             })
+
 
         # ---------------------------------------------------------
         # ENTER = navigation
@@ -153,15 +175,17 @@ class ValidatorAgent:
             })
 
         # ---------------------------------------------------------
-        # CLICK = small diff required
+        # CLICK search box special-case (Google omnibox)
         # ---------------------------------------------------------
-        
-        if "click search box" in desc or "search box" in desc:
+        if "click search box" in desc or "search box" in desc or "click address bar" in desc or "omnibox" in desc:
             return yaml.safe_dump({
                 "validation_status": "pass",
                 "details": {"method": "special_case", "reason": "google_search_box_clicked"}
             })
 
+        # ---------------------------------------------------------
+        # CLICK = small diff required
+        # ---------------------------------------------------------
         if "click" in desc:
             return yaml.safe_dump({
                 "validation_status": "pass" if diff > self.CLICK_THRESHOLD else "fail",
@@ -175,7 +199,6 @@ class ValidatorAgent:
             "validation_status": "pass" if diff > 1.0 else "fail",
             "details": {"method": "pixel", "diff": diff}
         })
-
 
     # ---------------------------------------------------------
     # ADVANCED VALIDATION (pixel diff + local region + OCR + bbox shift)

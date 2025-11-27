@@ -22,7 +22,10 @@ def main():
         # "Click on 'File' menu in VS Code bbox and scroll up",
         "Open Terminal and list out the files",
         # "Open browser and search Python tutorial",
-        # "Search youtube in browser and open first link",Click 'File' menu in VS Code
+        # "Search youtube in browser and click on first link",
+        # "Open new visual studio code window",
+        # "Open new visual studio code window and create python script name hello.py",
+        # "Open Documents/Vedanshi folder in the file explorer",
 
         image_path=screenshot_path
     )
