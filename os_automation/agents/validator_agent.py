@@ -1,24 +1,88 @@
+# # os_automation/agents/validator_agent.py
+# import os
+# import logging
+# from typing import Dict, Any
+# from PIL import Image, ImageChops, ImageStat
+
+# logger = logging.getLogger(__name__)
+
+# # Try OCR
+# try:
+#     import pytesseract
+#     OCR_AVAILABLE = True
+# except Exception:
+#     pytesseract = None
+#     OCR_AVAILABLE = False
+#     logger.debug("pytesseract not available; using pixel diff fallback.")
+
+
+# # ---------------------------------------------------------------------
+# # Pixel-diff helper
+# # ---------------------------------------------------------------------
+# def _pixel_diff(before_path: str, after_path: str) -> float:
+#     try:
+#         if not (before_path and after_path):
+#             return 0.0
+#         if not os.path.exists(before_path) or not os.path.exists(after_path):
+#             return 0.0
+
+#         b1 = Image.open(before_path).convert("RGB")
+#         b2 = Image.open(after_path).convert("RGB")
+
+#         # quick downscale to speed up processing
+#         b1 = b1.resize((b1.width // 2, b1.height // 2))
+#         b2 = b2.resize((b2.width // 2, b2.height // 2))
+
+#         diff = ImageChops.difference(b1, b2)
+#         stat = ImageStat.Stat(diff)
+#         mean_val = sum(stat.mean) / len(stat.mean)
+#         return mean_val
+#     except Exception as e:
+#         logger.exception("pixel diff error: %s", e)
+#         return 0.0
+
+
+# # ---------------------------------------------------------------------
+# # OCR helper
+# # ---------------------------------------------------------------------
+# def _ocr(image_path: str) -> str:
+#     if not OCR_AVAILABLE:
+#         return ""
+#     try:
+#         img = Image.open(image_path)
+#         text = pytesseract.image_to_string(img)
+#         return text or ""
+#     except Exception as e:
+#         logger.debug("OCR failed: %s", e)
+#         return ""
+
+
+
 # os_automation/agents/validator_agent.py
+
 import os
 import logging
-from typing import Dict, Any
+import base64
+import io
+from typing import Dict, Any, Optional
+
 from PIL import Image, ImageChops, ImageStat
+
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 # Try OCR
 try:
     import pytesseract
+
     OCR_AVAILABLE = True
 except Exception:
     pytesseract = None
     OCR_AVAILABLE = False
-    logger.debug("pytesseract not available; using pixel diff fallback.")
+    logger.debug("pytesseract not available; using pixel diff only.")
 
 
-# ---------------------------------------------------------------------
-# Pixel-diff helper
-# ---------------------------------------------------------------------
 def _pixel_diff(before_path: str, after_path: str) -> float:
     try:
         if not (before_path and after_path):
@@ -29,9 +93,9 @@ def _pixel_diff(before_path: str, after_path: str) -> float:
         b1 = Image.open(before_path).convert("RGB")
         b2 = Image.open(after_path).convert("RGB")
 
-        # quick downscale to speed up processing
-        b1 = b1.resize((b1.width // 2, b1.height // 2))
-        b2 = b2.resize((b2.width // 2, b2.height // 2))
+        # downsample to make diff more stable and cheap
+        b1 = b1.resize((max(1, b1.width // 2), max(1, b1.height // 2)))
+        b2 = b2.resize((max(1, b2.width // 2), max(1, b2.height // 2)))
 
         diff = ImageChops.difference(b1, b2)
         stat = ImageStat.Stat(diff)
@@ -42,9 +106,6 @@ def _pixel_diff(before_path: str, after_path: str) -> float:
         return 0.0
 
 
-# ---------------------------------------------------------------------
-# OCR helper
-# ---------------------------------------------------------------------
 def _ocr(image_path: str) -> str:
     if not OCR_AVAILABLE:
         return ""
@@ -57,20 +118,108 @@ def _ocr(image_path: str) -> str:
         return ""
 
 
-# (inside os_automation/agents/validator_agent.py)
-
-# Adjusted thresholds (less aggressive for OCR-first validation)
 class ValidatorAgent:
-    TYPE_THRESHOLD = 0.08    # lowered from 0.3 — terminal typing tends to produce tiny pixel diffs
-    CLICK_THRESHOLD = 0.5    # slightly lowered to be more tolerant of subtle UI changes
-    NAVIGATION_THRESHOLD = 4.0
+    """
+    Validates each step using:
+      - pixel diff
+      - OCR (when available)
+      - optional LLM text-based decision for ambiguous cases
+    """
 
+    # These thresholds are in mean 0–255 per pixel space
+    TYPE_THRESHOLD = 2.0
+    CLICK_THRESHOLD = 5.0
+    NAVIGATION_THRESHOLD = 5.0
+
+    def __init__(self):
+        self.llm_client: Optional[OpenAI] = None
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            try:
+                self.llm_client = OpenAI(api_key=api_key)
+            except Exception as e:
+                logger.debug("ValidatorAgent: failed to init OpenAI client: %s", e)
+
+    # ========================= LLM Helpers =========================
+    def _encode_small_preview(
+        self,
+        image_path: str,
+        max_size=(600, 400),
+        max_bytes: int = 50_000,
+    ) -> str:
+        try:
+            if not image_path or not os.path.exists(image_path):
+                return ""
+            img = Image.open(image_path).convert("RGB")
+            img.thumbnail(max_size)
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=60)
+            b = buf.getvalue()
+            if len(b) > max_bytes:
+                b = b[:max_bytes]
+            return base64.b64encode(b).decode("ascii")
+        except Exception as e:
+            logger.debug("preview encode failed: %s", e)
+            return ""
+
+    def _llm_validation_decision(
+        self,
+        step_desc: str,
+        event_hint: str,
+        diff: float,
+        ocr_excerpt: str = "",
+    ) -> Optional[bool]:
+        """
+        Ask LLM to break ties only when there IS some change but it's below
+        our strict pixel thresholds.
+        """
+        if not self.llm_client:
+            return None
+        try:
+            system_msg = (
+                "You are a strict OS automation validator. Given a step description, "
+                "a numeric pixel diff, and optional OCR excerpt, decide if the step "
+                "likely succeeded. Reply ONLY 'pass' or 'fail'."
+            )
+            user_msg = (
+                f"Step description: {step_desc}\n"
+                f"Event type: {event_hint}\n"
+                f"Pixel diff value: {diff:.4f}\n"
+                f"OCR excerpt after step: {ocr_excerpt[:200]}\n\n"
+                "Respond 'pass' if the change matches, otherwise 'fail'."
+            )
+
+            resp = self.llm_client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": user_msg},
+                ],
+                max_tokens=5,
+            )
+            answer = (resp.choices[0].message.content or "").strip().lower()
+            if answer.startswith("pass"):
+                return True
+            if answer.startswith("fail"):
+                return False
+        except Exception as e:
+            logger.debug("LLM validation failed: %s", e)
+        return None
+
+    # ========================= YAML Entry =========================
     def validate_step_yaml(self, exec_yaml: str) -> str:
         import yaml
+
         try:
             data = yaml.safe_load(exec_yaml) or {}
         except Exception:
-            return yaml.safe_dump({"validation_status": "fail", "details": {"reason": "invalid_exec_yaml"}})
+            return yaml.safe_dump(
+                {
+                    "validation_status": "fail",
+                    "details": {"reason": "invalid_exec_yaml"},
+                }
+            )
 
         step = data.get("step", {})
         exe = data.get("execution", {})
@@ -79,231 +228,313 @@ class ValidatorAgent:
         before = exe.get("before")
         after = exe.get("after")
 
-        # 1. Executor fail → fail
         if exe.get("status") == "failed":
-            return yaml.safe_dump({"validation_status": "fail",
-                                   "details": {"reason": "executor_failed"}})
+            return yaml.safe_dump(
+                {"validation_status": "fail", "details": {"reason": "executor_failed"}}
+            )
 
-        # 2. screenshot missing
-        if not before or not after or not os.path.exists(before) or not os.path.exists(after):
-            return yaml.safe_dump({"validation_status": "fail",
-                                   "details": {"reason": "missing_screenshots"}})
+        if not before or not after or not os.path.exists(before) or not os.path.exists(
+            after
+        ):
+            return yaml.safe_dump(
+                {
+                    "validation_status": "fail",
+                    "details": {"reason": "missing_screenshots"},
+                }
+            )
 
         diff = _pixel_diff(before, after)
 
-        # ---------------------------
-        # Special-cases (search results / first link)
-        # ---------------------------
-        if any(k in desc for k in ("first search result", "first result", "first link", "open first result")):
-            # Many SERP clicks change page but may not show large pixel diffs in the cropped area.
-            return yaml.safe_dump({
-                "validation_status": "pass",
-                "details": {"method": "special_case", "reason": "first_search_result_click_assumed_ok"}
-            })
+        # Quick short-circuit: no noticeable change at all → fail
+        if diff < 0.5:
+            return yaml.safe_dump(
+                {
+                    "validation_status": "fail",
+                    "details": {"reason": "no_visual_change", "diff": diff},
+                }
+            )
 
-        # ---------------------------------------------------------
-        # TYPING + TERMINAL COMMANDS (Type '...' / Run command '...')
-        # ---------------------------------------------------------
-        import re
-
-        is_type_step = desc.startswith("type ") or desc.startswith("type'") or "type '" in desc
-        is_run_cmd_step = desc.startswith("run command") or "run command" in desc
-        looks_like_terminal = is_run_cmd_step or "terminal" in desc or "shell" in desc or "command prompt" in desc
-
-        if is_type_step or is_run_cmd_step:
-            # Extract the quoted text: 'ls', 'pwd', etc.
-            m = re.search(r"['\"](.+?)['\"]", step.get("description", ""))
-            expected = (m.group(1) if m else "").strip()
-
-            # Try OCR on the after screenshot if available
-            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
-
-            # 1) Exact OCR match of the expected text → strong PASS
-            if expected and expected.lower() in ocr_after:
-                return yaml.safe_dump({
+        # Special-case "first search result" type clicks – still allow some optimism
+        if any(
+            k in desc
+            for k in (
+                "first search result",
+                "first result",
+                "first link",
+                "open first result",
+            )
+        ):
+            return yaml.safe_dump(
+                {
                     "validation_status": "pass",
                     "details": {
-                        "method": "ocr",
-                        "matched": expected,
-                        "note": "expected text found in OCR output"
-                    }
-                })
+                        "method": "special_case",
+                        "reason": "first_search_result_click_assumed_ok",
+                        "diff": diff,
+                    },
+                }
+            )
 
-            # 2) Terminal heuristic:
-            #    - 'run command ...' OR description mentions terminal
-            #    - we just need to see that *something* appeared in the terminal
+        import re
+
+        is_type_step = desc.startswith("type ") or "type '" in desc
+        is_run_cmd_step = "run command" in desc
+        looks_like_terminal = is_run_cmd_step or "terminal" in desc or "shell" in desc
+
+        # ===================== Typing / Run Command =====================
+        if is_type_step or is_run_cmd_step:
+            m = re.search(r"['\"](.+?)['\"]", step.get("description", ""))
+            expected = (m.group(1) if m else "").strip()
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+
+            # Exact OCR match if available
+            if expected and expected.lower() in ocr_after:
+                return yaml.safe_dump(
+                    {
+                        "validation_status": "pass",
+                        "details": {"method": "ocr", "matched": expected, "diff": diff},
+                    }
+                )
+
+            # Terminal: content just changed somehow
             if looks_like_terminal:
                 if ocr_after.strip():
-                    # Any non-trivial text in the terminal after the command is a good sign
-                    return yaml.safe_dump({
-                        "validation_status": "pass",
-                        "details": {
-                            "method": "ocr_terminal_heuristic",
-                            "ocr_excerpt": ocr_after[:200]
+                    return yaml.safe_dump(
+                        {
+                            "validation_status": "pass",
+                            "details": {
+                                "method": "ocr_terminal_heuristic",
+                                "ocr_excerpt": ocr_after[:200],
+                                "diff": diff,
+                            },
                         }
-                    })
+                    )
 
-                # Fallback: use a very small pixel threshold
-                return yaml.safe_dump({
-                    "validation_status": "pass" if diff > self.TYPE_THRESHOLD else "fail",
-                    "details": {
-                        "method": "pixel_terminal",
-                        "diff": diff,
-                        "threshold": self.TYPE_THRESHOLD
-                    }
-                })
-
-            # 3) Non-terminal typing (e.g. typing in a text field)
-            #    → relaxed pixel threshold
-            return yaml.safe_dump({
-                "validation_status": "pass" if diff > self.TYPE_THRESHOLD else "fail",
-                "details": {
-                    "method": "pixel_typing",
+                # Pixel-based decision
+                status = "pass" if diff > self.TYPE_THRESHOLD else "fail"
+                details: Dict[str, Any] = {
+                    "method": "pixel_terminal",
                     "diff": diff,
-                    "threshold": self.TYPE_THRESHOLD
+                    "threshold": self.TYPE_THRESHOLD,
                 }
-            })
 
+                # Use LLM only when diff is non-zero but below threshold
+                if status == "fail" and diff > 0.5:
+                    llm_decision = self._llm_validation_decision(
+                        step.get("description", ""),
+                        "terminal_type_or_run",
+                        diff,
+                        ocr_after[:200],
+                    )
+                    if llm_decision is True:
+                        status = "pass"
+                        details["llm_override"] = True
+                    elif llm_decision is False:
+                        details["llm_confirmation"] = "fail"
 
-        # ---------------------------------------------------------
-        # ENTER = navigation
-        # ---------------------------------------------------------
+                return yaml.safe_dump(
+                    {"validation_status": status, "details": details}
+                )
+
+            # Non-terminal typing
+            status = "pass" if diff > self.TYPE_THRESHOLD else "fail"
+            details: Dict[str, Any] = {
+                "method": "pixel_typing",
+                "diff": diff,
+                "threshold": self.TYPE_THRESHOLD,
+            }
+            if status == "fail" and diff > 0.5:
+                llm_decision = self._llm_validation_decision(
+                    step.get("description", ""),
+                    "typing",
+                    diff,
+                    "",
+                )
+                if llm_decision is True:
+                    status = "pass"
+                    details["llm_override"] = True
+                elif llm_decision is False:
+                    details["llm_confirmation"] = "fail"
+            return yaml.safe_dump({"validation_status": status, "details": details})
+
+        # ===================== Press Enter / Navigation =====================
         if "press enter" in desc or desc == "enter":
-            return yaml.safe_dump({
-                "validation_status": "pass" if diff > self.NAVIGATION_THRESHOLD else "fail",
-                "details": {"reason": "navigation_change", "diff": diff}
-            })
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+            status = "pass" if diff > self.NAVIGATION_THRESHOLD else "fail"
+            details: Dict[str, Any] = {
+                "reason": "navigation_change",
+                "diff": diff,
+                "threshold": self.NAVIGATION_THRESHOLD,
+            }
+            if status == "fail" and diff > 0.5:
+                llm_decision = self._llm_validation_decision(
+                    step.get("description", ""),
+                    "press_enter",
+                    diff,
+                    ocr_after[:200],
+                )
+                if llm_decision is True:
+                    status = "pass"
+                    details["llm_override"] = True
+                elif llm_decision is False:
+                    details["llm_confirmation"] = "fail"
+            return yaml.safe_dump({"validation_status": status, "details": details})
 
-        # ---------------------------------------------------------
-        # CLICK search box special-case (Google omnibox)
-        # ---------------------------------------------------------
-        if "click search box" in desc or "search box" in desc or "click address bar" in desc or "omnibox" in desc:
-            return yaml.safe_dump({
-                "validation_status": "pass",
-                "details": {"method": "special_case", "reason": "google_search_box_clicked"}
-            })
+        # ===================== Special Search Box / Omnibox =====================
+        if any(
+            k in desc for k in ("click search box", "search box", "click address bar")
+        ):
+            return yaml.safe_dump(
+                {
+                    "validation_status": "pass",
+                    "details": {
+                        "method": "special_case",
+                        "reason": "google_search_box_clicked",
+                        "diff": diff,
+                    },
+                }
+            )
 
-        # ---------------------------------------------------------
-        # CLICK = small diff required
-        # ---------------------------------------------------------
-        if "click" in desc:
-            return yaml.safe_dump({
-                "validation_status": "pass" if diff > self.CLICK_THRESHOLD else "fail",
-                "details": {"method": "pixel", "diff": diff}
-            })
+        # ===================== Generic Click =====================
+        if "click" in desc or "double click" in desc or "right click" in desc:
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+            status = "pass" if diff > self.CLICK_THRESHOLD else "fail"
+            details: Dict[str, Any] = {
+                "method": "pixel",
+                "diff": diff,
+                "threshold": self.CLICK_THRESHOLD,
+            }
+            if status == "fail" and diff > 0.5:
+                llm_decision = self._llm_validation_decision(
+                    step.get("description", ""), "click", diff, ocr_after[:200]
+                )
+                if llm_decision is True:
+                    status = "pass"
+                    details["llm_override"] = True
+                elif llm_decision is False:
+                    details["llm_confirmation"] = "fail"
+            return yaml.safe_dump({"validation_status": status, "details": details})
 
-        # ---------------------------------------------------------
-        # DEFAULT
-        # ---------------------------------------------------------
-        return yaml.safe_dump({
-            "validation_status": "pass" if diff > 1.0 else "fail",
-            "details": {"method": "pixel", "diff": diff}
-        })
+        # ===================== Default: any other change =====================
+        status = "pass" if diff > self.NAVIGATION_THRESHOLD else "fail"
+        details: Dict[str, Any] = {
+            "method": "pixel_default",
+            "diff": diff,
+            "threshold": self.NAVIGATION_THRESHOLD,
+        }
+        if status == "fail" and diff > 0.5:
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+            llm_decision = self._llm_validation_decision(
+                step.get("description", ""), "default", diff, ocr_after[:200]
+            )
+            if llm_decision is True:
+                status = "pass"
+                details["llm_override"] = True
+            elif llm_decision is False:
+                details["llm_confirmation"] = "fail"
 
-    # ---------------------------------------------------------
-    # ADVANCED VALIDATION (pixel diff + local region + OCR + bbox shift)
-    # ---------------------------------------------------------
-    def validate_step_advanced(self, description: str, before_path: str, after_path: str, bbox):
-        """
-        More reliable validator for clicks and UI state changes.
-        Uses:
-          1) Local region diff
-          2) Global diff
-          3) OCR text match
-          4) Bounding-box state shift
-        """
+        import yaml as _yaml
 
+        return _yaml.safe_dump(
+            {"validation_status": status, "details": details}
+        )
+
+    # ----------------------------------------------------------------
+    # Optional: Advanced validator (kept as-is for compatibility)
+    # ----------------------------------------------------------------
+    def validate_step_advanced(
+        self,
+        description: str,
+        before_path: str,
+        after_path: str,
+        bbox,
+    ):
         import numpy as np
-        from PIL import Image
 
         desc = description.lower()
-
-        # Sanity check
         if not before_path or not after_path:
             return {"valid": False, "reason": "missing_screenshots"}
-
         if not os.path.exists(before_path) or not os.path.exists(after_path):
             return {"valid": False, "reason": "missing_files"}
 
         before_img = Image.open(before_path).convert("L")
         after_img = Image.open(after_path).convert("L")
-
         bw, bh = before_img.size
 
-        # -----------------------------------------
-        # 1) Local region diff
-        # -----------------------------------------
+        # local region compare
         try:
             x, y, w, h = bbox or [0, 0, 50, 50]
             pad = 40
-
             region = (
                 max(0, x - pad),
                 max(0, y - pad),
                 min(bw, x + w + pad),
-                min(bh, y + h + pad)
+                min(bh, y + h + pad),
             )
-
             before_crop = before_img.crop(region)
             after_crop = after_img.crop(region)
-
-            diff_local = np.mean(np.abs(
-                np.array(before_crop, dtype=np.int16)
-                - np.array(after_crop, dtype=np.int16)
-            ))
-
+            diff_local = np.mean(
+                np.abs(
+                    np.array(before_crop, dtype=np.int16)
+                    - np.array(after_crop, dtype=np.int16)
+                )
+            )
             if diff_local > 12:
-                return {"valid": True, "reason": "local_difference_detected", "diff_local": float(diff_local)}
+                return {
+                    "valid": True,
+                    "reason": "local_difference_detected",
+                    "diff_local": float(diff_local),
+                }
         except Exception:
             pass
 
-        # -----------------------------------------
-        # 2) Global pixel diff
-        # -----------------------------------------
+        # global diff
         try:
-            diff_global = np.mean(np.abs(
-                np.array(before_img, dtype=np.int16)
-                - np.array(after_img, dtype=np.int16)
-            ))
-
+            diff_global = np.mean(
+                np.abs(
+                    np.array(before_img, dtype=np.int16)
+                    - np.array(after_img, dtype=np.int16)
+                )
+            )
             if diff_global > 6:
-                return {"valid": True, "reason": "global_change_detected", "diff_global": float(diff_global)}
+                return {
+                    "valid": True,
+                    "reason": "global_change_detected",
+                    "diff_global": float(diff_global),
+                }
         except Exception:
             pass
 
-        # -----------------------------------------
-        # 3) OCR-based validation
-        # -----------------------------------------
+        # OCR-based fallback
         if OCR_AVAILABLE:
             try:
                 text_after = _ocr(after_path).lower()
-
-                # direct substring detection
                 if any(tok in text_after for tok in desc.split()):
-                    return {"valid": True, "reason": "ocr_matched", "excerpt": text_after[:200]}
+                    return {
+                        "valid": True,
+                        "reason": "ocr_matched",
+                        "excerpt": text_after[:200],
+                    }
             except Exception:
                 pass
 
-        # -----------------------------------------
-        # 4) Bounding box "state shift" detection
-        # -----------------------------------------
-        # Example: selected tab highlight changes position or shape
+        # bbox region diff
         try:
-            # Compare average brightness around bbox
+            x, y, w, h = bbox or [0, 0, 50, 50]
             bx1 = before_img.crop((x, y, x + w, y + h))
             bx2 = after_img.crop((x, y, x + w, y + h))
-
-            diff_bbox = np.mean(np.abs(
-                np.array(bx1, dtype=np.int16)
-                - np.array(bx2, dtype=np.int16)
-            ))
-
+            diff_bbox = np.mean(
+                np.abs(
+                    np.array(bx1, dtype=np.int16) - np.array(bx2, dtype=np.int16)
+                )
+            )
             if diff_bbox > 10:
-                return {"valid": True, "reason": "bbox_state_changed", "diff_bbox": float(diff_bbox)}
+                return {
+                    "valid": True,
+                    "reason": "bbox_state_changed",
+                    "diff_bbox": float(diff_bbox),
+                }
         except Exception:
             pass
 
-        # -----------------------------------------
-        # 5) No significant change → invalid
-        # -----------------------------------------
         return {"valid": False, "reason": "no_state_change_detected"}

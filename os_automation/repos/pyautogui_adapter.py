@@ -70,7 +70,8 @@ class PyAutoGUIAdapter(BaseAdapter):
             "text": "...",
             "key": "...",
             "keys": ["ctrl","a"],
-            "direction": "up|down"
+            "direction": "up|down",
+            # optionally: "decision": {"event": ..., "text": ..., "key": ...}
         }
         """
         event = step.get("event")
@@ -79,6 +80,16 @@ class PyAutoGUIAdapter(BaseAdapter):
         key = step.get("key")
         keys = step.get("keys")
         direction = step.get("direction")
+
+        # ✅ Backward-compatible: if event is missing but 'decision' is present,
+        # pull fields from decision.
+        decision = step.get("decision") or {}
+        if event is None and decision:
+            event = decision.get("event", event)
+            text = text or decision.get("text")
+            key = key or decision.get("key")
+            keys = keys or decision.get("keys")
+            direction = direction or decision.get("direction")
 
         if not bbox:
             raise ValueError("bbox required")
