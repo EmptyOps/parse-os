@@ -58,5 +58,3 @@ executor_adapters:
 default_tools:
   detection: osatlas        # ✅ switch from open_computer_use
   executor: pyautogui       # ✅ switch from open_computer_use
-
-

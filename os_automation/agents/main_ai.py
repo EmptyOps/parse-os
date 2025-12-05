@@ -39,8 +39,14 @@ class MainAIAgent:
     """
 
     def __init__(self, model: str = "gpt-4o"):
+      
         self.model = model
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+        # ==== NEW FIELDS FOR OPENCOMPUTERUSE STYLE FEEDBACK LOOPS ====
+        self.history: List[Dict[str, Any]] = []
+        self.original_prompt: Optional[str] = None
+
 
     # -----------------------------------------------------
     # Step 1 — High-level → micro-plan
@@ -50,6 +56,10 @@ class MainAIAgent:
         Use an LLM to convert a natural-language task into micro-steps.
         MUST produce atomic actions, never combined steps.
         """
+        
+        # 🔥 REQUIRED FOR OBSERVATION-DRIVEN PLANNING
+        self.original_prompt = user_prompt
+        self.history = []
 
         system_prompt = """
 You are an OS automation planner for a 3-agent system:
@@ -444,3 +454,58 @@ The output must be <= 3 words.
         )
 
         return resp.choices[0].message.content.strip()
+
+
+    def receive_observation(self, step_id: int, description: str, observation: str):
+        """
+          Store the effect of each action so the LLM can reason about what happened.
+        """
+        self.history.append({
+            "step_id": step_id,
+            "description": description,
+            "observation": observation
+        })
+
+
+    def decide_next_step(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        Ask LLM whether plan should change based on recent observations.
+        If no change needed → return None.
+        If plan should adjust → return a list of new steps (same YAML structure as planner).
+        """
+
+        if not self.history:
+            return None
+
+        prompt = f"""
+    User objective:
+    {self.original_prompt}
+
+    Steps executed so far:
+    {yaml.safe_dump(self.history)}
+
+    Should we continue with the original next step OR adjust the plan?
+    IF adjustment needed, output YAML of new steps (same format as planner).
+    IF no adjustment needed, output: `continue` only.
+    """
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=0,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        if raw.lower() == "continue":
+            return None
+
+        raw = _extract_raw_yaml_block(raw)
+        try:
+            parsed = yaml.safe_load(raw)
+            if isinstance(parsed, dict) and "steps" in parsed:
+                return parsed["steps"]
+        except:
+            return None
+
+        return None

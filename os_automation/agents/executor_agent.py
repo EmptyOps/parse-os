@@ -1699,8 +1699,10 @@ class ExecutorAgent:
             result = self._handle_open_browser(step)
             return yaml.safe_dump(result, sort_keys=False)
 
+        
+        
         # =========================
-        # NORMAL EXECUTION LOOP
+        # STRICT EXECUTION LOOP  (FIXED)
         # =========================
         attempt = 0
         last_execution = None
@@ -1708,88 +1710,65 @@ class ExecutorAgent:
 
         while attempt < max_attempts:
             attempt += 1
-            logger.info(
-                "Executor attempt %d for step %s: %s",
-                attempt,
-                step_id,
-                description,
-            )
+            logger.info("Executor attempt %d for step %s: %s", attempt, step_id, description)
 
+            # Screenshot BEFORE for visual state check
             shot = _screenshot(self.output_dir, "shot")
             bbox = self._detect_bbox(description, image_path=shot)
 
-            # If no bbox, we still try event (e.g., keypress) but mark no target
-            if not bbox:
-                logger.warning(
-                    "No bbox found for step '%s' (attempt=%d)", description, attempt
-                )
+            # =========================
+            # STRICT – bbox not found → mark failed attempt (NO ACTION)
+            # =========================
+            if bbox is None:
+                logger.warning("[STRICT] No bbox found → marking attempt as failed without event.")
 
-            # Decide event type from description
+                exec_result = {
+                    "status": "failed",
+                    "before": _screenshot(self.output_dir, "before_no_bbox"),
+                    "after": _screenshot(self.output_dir, "after_no_bbox"),
+                    "error": "no_bbox_detected"
+                }
+
+                last_execution = exec_result
+                exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
+                validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+                validation = yaml.safe_load(validation_yaml)
+                last_validation = validation
+
+                logger.debug("→ Validation (no bbox): %s", validation)
+                time.sleep(0.8)
+                continue
+            
+            # =========================
+            # NORMAL STRICT EXECUTION
+            # =========================
             event_spec = self._map_description_to_event(description)
-
-            # Execute via adapter
             exec_result = self._perform_via_adapter(bbox, event_spec)
             last_execution = exec_result
 
-            # Validate
-            exec_yaml = yaml.safe_dump(
-                {"step": step, "execution": exec_result}, sort_keys=False
-            )
+            exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
             validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
             validation = yaml.safe_load(validation_yaml)
             last_validation = validation
 
             if validation.get("validation_status") == "pass":
-                # success → return
                 return yaml.safe_dump(
-                    {
-                        "execution": {"attempts": attempt, "last": last_execution},
-                        "validation": validation,
-                        "escalate": False,
-                    },
+                    {"execution": {"attempts": attempt, "last": last_execution},
+                     "validation": validation, "escalate": False},
                     sort_keys=False,
                 )
 
-            logger.debug(
-                "Step attempt %d failed validation: %s", attempt, validation
-            )
-            time.sleep(0.8)
+            logger.debug("Step attempt %d failed: %s", attempt, validation)
+            time.sleep(1.1)
 
-        # =========================
-        # Escalate to planner
-        # =========================
-        failed_step_yaml = yaml.safe_dump({"step": step}, sort_keys=False)
-        failure_details_yaml = yaml.safe_dump(
-            {"execution": last_execution, "validation": last_validation},
-            sort_keys=False,
-        )
-
-        ma = MainAIAgent()
-        oprompt = original_prompt or description
-        try:
-            replan_yaml = ma.replan_on_failure(
-                oprompt, failed_step_yaml, failure_details_yaml
-            )
-            replan_parsed = yaml.safe_load(replan_yaml)
-        except Exception as e:
-            logger.warning("Replan parsing failed: %s", e)
-            replan_parsed = {
-                "escalation": {
-                    "reason": "replan_failed_parse",
-                    "error": str(e),
-                    "raw": replan_yaml if "replan_yaml" in locals() else None,
-                }
-            }
-
+        # === all attempts failed → escalate to planner
         return yaml.safe_dump(
-            {
-                "execution": {"attempts": attempt, "last": last_execution},
-                "validation": last_validation,
-                "escalate": True,
-                "replan": replan_parsed,
-            },
+            {"execution": {"attempts": attempt, "last": last_execution},
+             "validation": last_validation,
+             "escalate": True},
             sort_keys=False,
         )
+
 
     # ====================================================================
     # BACKWARDS + ORCHESTRATOR-COMPATIBLE ENTRYPOINT
@@ -1845,3 +1824,4 @@ class ExecutorAgent:
                 },
                 "raw": yaml_result,
             }
+

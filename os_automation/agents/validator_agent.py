@@ -1,63 +1,3 @@
-# # os_automation/agents/validator_agent.py
-# import os
-# import logging
-# from typing import Dict, Any
-# from PIL import Image, ImageChops, ImageStat
-
-# logger = logging.getLogger(__name__)
-
-# # Try OCR
-# try:
-#     import pytesseract
-#     OCR_AVAILABLE = True
-# except Exception:
-#     pytesseract = None
-#     OCR_AVAILABLE = False
-#     logger.debug("pytesseract not available; using pixel diff fallback.")
-
-
-# # ---------------------------------------------------------------------
-# # Pixel-diff helper
-# # ---------------------------------------------------------------------
-# def _pixel_diff(before_path: str, after_path: str) -> float:
-#     try:
-#         if not (before_path and after_path):
-#             return 0.0
-#         if not os.path.exists(before_path) or not os.path.exists(after_path):
-#             return 0.0
-
-#         b1 = Image.open(before_path).convert("RGB")
-#         b2 = Image.open(after_path).convert("RGB")
-
-#         # quick downscale to speed up processing
-#         b1 = b1.resize((b1.width // 2, b1.height // 2))
-#         b2 = b2.resize((b2.width // 2, b2.height // 2))
-
-#         diff = ImageChops.difference(b1, b2)
-#         stat = ImageStat.Stat(diff)
-#         mean_val = sum(stat.mean) / len(stat.mean)
-#         return mean_val
-#     except Exception as e:
-#         logger.exception("pixel diff error: %s", e)
-#         return 0.0
-
-
-# # ---------------------------------------------------------------------
-# # OCR helper
-# # ---------------------------------------------------------------------
-# def _ocr(image_path: str) -> str:
-#     if not OCR_AVAILABLE:
-#         return ""
-#     try:
-#         img = Image.open(image_path)
-#         text = pytesseract.image_to_string(img)
-#         return text or ""
-#     except Exception as e:
-#         logger.debug("OCR failed: %s", e)
-#         return ""
-
-
-
 # os_automation/agents/validator_agent.py
 
 import os
@@ -246,13 +186,13 @@ class ValidatorAgent:
         diff = _pixel_diff(before, after)
 
         # Quick short-circuit: no noticeable change at all → fail
-        if diff < 0.5:
+        # GNOME STRICT MODE — diff below 1.2 always fails
+        if diff < 1.2:
             return yaml.safe_dump(
-                {
-                    "validation_status": "fail",
-                    "details": {"reason": "no_visual_change", "diff": diff},
-                }
+                {"validation_status": "fail",
+                 "details": {"reason": "no_visual_change", "diff": diff}}
             )
+
 
         # Special-case "first search result" type clicks – still allow some optimism
         if any(
@@ -360,25 +300,16 @@ class ValidatorAgent:
         # ===================== Press Enter / Navigation =====================
         if "press enter" in desc or desc == "enter":
             ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
-            status = "pass" if diff > self.NAVIGATION_THRESHOLD else "fail"
-            details: Dict[str, Any] = {
-                "reason": "navigation_change",
-                "diff": diff,
-                "threshold": self.NAVIGATION_THRESHOLD,
-            }
-            if status == "fail" and diff > 0.5:
-                llm_decision = self._llm_validation_decision(
-                    step.get("description", ""),
-                    "press_enter",
-                    diff,
-                    ocr_after[:200],
+            # GNOME rule → Enter passes ONLY if content changed
+            if diff > 2.5 or len(ocr_after) > 0:
+                return yaml.safe_dump(
+                    {"validation_status": "pass",
+                    "details": {"diff": diff, "ocr_excerpt": ocr_after[:200]}}
                 )
-                if llm_decision is True:
-                    status = "pass"
-                    details["llm_override"] = True
-                elif llm_decision is False:
-                    details["llm_confirmation"] = "fail"
-            return yaml.safe_dump({"validation_status": status, "details": details})
+            return yaml.safe_dump(
+                {"validation_status": "fail",
+                "details": {"reason": "enter_no_effect", "diff": diff}}
+            )
 
         # ===================== Special Search Box / Omnibox =====================
         if any(

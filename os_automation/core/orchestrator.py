@@ -366,104 +366,50 @@ class Orchestrator:
 
             final_step_reports = []
 
-            # ---------------------------
-            # 2️⃣ Execute each step via executor_agent run_step()
-            # ---------------------------
             for step in planned_steps:
                 print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
 
-                # -----------------------------
-                # FIX 5 — Prevent accidental browser opening
-                # -----------------------------
-                prompt_low = (user_prompt or "").lower().strip()
-                desc_low = step.description.lower().strip()
-
-                if desc_low in ("open browser", "open the browser", "open chrome", "open google chrome"):
-                    if any(k in prompt_low for k in ["terminal", "ls", "pwd", "cd ", "list files", "list out the files", "open terminal"]):
-                        print("[Orchestrator] Removing incorrect 'open browser' step due to terminal intent.")
-                        final_step_reports.append({
-                            "step": step.dict(),
-                            "execution": None,
-                            "validation": {
-                                "validation_status": "skipped",
-                                "reason": "browser_step_removed_terminal_intent"
-                            }
-                        })
-                        continue
-
-
                 step_result = self.executor_agent.run_step(
+                    step_id=step.step_id,
                     step_description=step.description,
                     validator_agent=self.validator_agent,
-                    max_attempts=3  # we handle retries via replan loop below
+                    max_attempts=3
                 )
 
-                validation_status = step_result.get("validation", {}).get("validation_status")
-                step_report = {"step": step.dict(), "execution": step_result.get("execution"), "validation": step_result.get("validation")}
+                # ---- Store into final report list ----
+                step_report = {
+                    "step": step.dict(),
+                    "execution": step_result.get("execution"),
+                    "validation": step_result.get("validation")
+                }
                 final_step_reports.append(step_report)
 
-                if validation_status == "pass":
-                    # success -> continue to next step
-                    continue
+                # ---- Feed observation into planner memory ----
+                observation = step_result.get("validation", {}).get("observation")
+                self.main_agent.receive_observation(step.step_id, step.description, observation)
 
-                # If step failed, attempt replan via main_agent.replan_on_failure (1-2 retries)
-                print(f"[Orchestrator] Step {step.step_id} failed (status={validation_status}). Attempting replan...")
-                failed_step_yaml = yaml.safe_dump({"step": {"step_id": step.step_id, "description": step.description}})
-                failure_details_yaml = yaml.safe_dump(step_result)
+                # ---- Ask main agent if next step should change ----
+                next_steps = self.main_agent.decide_next_step()
 
-                replan_yaml = self.main_agent.replan_on_failure(user_prompt, failed_step_yaml, failure_details_yaml)
-                try:
-                    replan_parsed = yaml.safe_load(replan_yaml)
-                except Exception:
-                    replan_parsed = None
+                if next_steps is None:
+                    continue  # proceed normally
 
-                replan_steps = []
-                if isinstance(replan_parsed, dict) and "steps" in replan_parsed:
-                    replan_steps = [s for s in replan_parsed["steps"]]
-                elif isinstance(replan_parsed, dict) and "escalation" in replan_parsed:
-                    # escalate — abort with diagnostics
-                    return {
-                        "user_prompt": user_prompt,
-                        "overall_status": "failed",
-                        "mode": "partial",
-                        "reason": "escalation",
-                        "escalation": replan_parsed["escalation"],
-                        "steps": final_step_reports
-                    }
+                # ---- Run replacement steps (dynamic replanning engine) ----
+                for ns in next_steps:
+                    ns_desc = ns["description"]
+                    tmp = self.executor_agent.run_step(
+                        step_id=ns.get("step_id", 9999),
+                        step_description=ns_desc,
+                        validator_agent=self.validator_agent,
+                        max_attempts=1
+                    )
 
-                # If replan produced new steps, run them (one pass)
-                if replan_steps:
-                    print(f"[Orchestrator] Replan produced {len(replan_steps)} step(s). Running them sequentially...")
-                    for rs in replan_steps:
-                        tmp_desc = rs.get("description") if isinstance(rs, dict) else str(rs)
-                        tmp_result = self.executor_agent.run_step(step_description=tmp_desc, validator_agent=self.validator_agent, max_attempts=2)
-                        final_step_reports.append({
-                            "step": {"step_id": rs.get("step_id", 0), "description": tmp_desc},
-                            "execution": tmp_result.get("execution"),
-                            "validation": tmp_result.get("validation")
-                        })
-                        if tmp_result.get("validation", {}).get("validation_status") == "pass":
-                            break  # consider the replan a success
-                    # re-evaluate overall success for original step
-                    last_val = final_step_reports[-1]["validation"]
-                    if last_val and last_val.get("validation_status") == "pass":
-                        continue
-                # If we get here -> replan didn't help
-                print(f"❌ Step {step.step_id} FAILED after replans — stopping execution.")
-                return {
-                    "user_prompt": user_prompt,
-                    "overall_status": "failed",
-                    "mode": "partial",
-                    "steps": final_step_reports
-                }
+                    final_step_reports.append({
+                        "step": {"step_id": ns.get("step_id", 9999), "description": ns_desc},
+                        "execution": tmp.get("execution"),
+                        "validation": tmp.get("validation")
+                    })
 
-            # If loop completes without fail:
-            return {
-                "user_prompt": user_prompt,
-                "overall_status": "success",
-                "mode": "partial",
-                "steps": final_step_reports
-            }
 
 
         
