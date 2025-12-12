@@ -1166,31 +1166,30 @@
 #                 "raw": yaml_result
 #             }
 
-
-
 # os_automation/agents/executor_agent.py
-
 import os
 import time
 import uuid
 import yaml
 import logging
 import random
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 
 import platform
 import subprocess
+import re
 
 from PIL import Image
 import pyautogui
 
 from os_automation.agents.validator_agent import ValidatorAgent
 from os_automation.core.registry import registry
-from os_automation.repos.osatlas_adapter import (
-    _parse_position_raw,
-    normalize_coordinates,
-)
-from os_automation.agents.main_ai import MainAIAgent
+
+# try to import MainAIAgent only if available (used for optional rewrite)
+try:
+    from os_automation.agents.main_ai import MainAIAgent
+except Exception:
+    MainAIAgent = None
 
 logger = logging.getLogger(__name__)
 pyautogui.FAILSAFE = True
@@ -1257,6 +1256,20 @@ class ExecutorAgent:
         except Exception:
             pass
 
+        # Optional rewrite using MainAIAgent when OpenAI key available.
+        # If not available, use a lightweight fallback rewrite function.
+        self._rewrite_fn: Optional[Callable[[str], str]] = None
+        try:
+            if MainAIAgent and os.getenv("OPENAI_API_KEY"):
+                ma = MainAIAgent()
+                # use the agent's method for rewrite (may call LLM)
+                self._rewrite_fn = ma.rewrite_ui_query
+            else:
+                # local fallback
+                self._rewrite_fn = self._local_rewrite_ui_query
+        except Exception:
+            self._rewrite_fn = self._local_rewrite_ui_query
+
     # ====================================================================
     # ADAPTERS
     # ====================================================================
@@ -1273,18 +1286,77 @@ class ExecutorAgent:
         return factory() if callable(factory) else factory
 
     # ====================================================================
+    # LOCAL REWRITE (fallback)
+    # ====================================================================
+    def _local_rewrite_ui_query(self, description: str) -> str:
+        """
+        Lightweight heuristic to convert vague step descriptions into short
+        queries that detectors handle better.
+        """
+        desc = (description or "").lower()
+        # common mappings
+        mapping = {
+            "address bar": "address bar",
+            "omnibox": "address bar",
+            "search box": "search",
+            "searchbar": "search",
+            "search bar": "search",
+            "google search": "search",
+            "vscode explorer": "explorer",
+            "explorer icon": "explorer",
+            "new file": "new file",
+            "new file button": "new file",
+            "file name field": "file name",
+            "filename field": "file name",
+            "first result": "first result",
+            "first link": "first result",
+            "profile icon": "profile icon",
+            "menu": "menu",
+            "settings": "settings",
+            "three dots": "menu",
+            "submit": "submit",
+            "ok": "ok button",
+            "close": "close button",
+            "play": "play button",
+            "pause": "pause button",
+        }
+        for k, v in mapping.items():
+            if k in desc:
+                return v
+
+        # extract quoted text
+        m = re.search(r"['\"]([^'\"]{1,60})['\"]", description)
+        if m:
+            return m.group(1)
+
+        # last-resort: pick last noun-like token
+        tokens = re.findall(r"[a-zA-Z0-9_-]{2,50}", desc)
+        if tokens:
+            # prefer short tokens near start that indicate UI
+            for t in tokens:
+                if t in ("button", "icon", "link", "menu", "search", "address", "file", "run"):
+                    return t
+            return tokens[-1]
+
+        return description.strip()
+
+    # ====================================================================
     # DETECT BBOX
     # ====================================================================
     def _detect_bbox(
         self, description: str, image_path: Optional[str] = None
     ) -> Optional[List[int]]:
         """
-        Use detection adapter (OSAtlas) to find target region.
+        Use detection adapter (OSAtlas or other) to find target region.
 
-        Returns bbox as [x, y, w, h] in screenshot coordinates or None.
-        Ignores pure 'center_fallback' detections as "no real target".
+        Returns bbox as [x, y, w, h] in SCREEN coordinates or None.
+        Strategy:
+          - rewrite query to something detector-friendly
+          - call detector with image + text
+          - prefer structured bbox from response
+          - if only point provided, create an adaptive bbox sized by screen dims
+          - if raw_output contains coords, parse them
         """
-
         det = self._get_detection_adapter()
         if not det:
             logger.warning("No detection adapter configured.")
@@ -1292,74 +1364,117 @@ class ExecutorAgent:
 
         shot = image_path or _screenshot(self.output_dir, "shot")
 
-        # --- Normalize query a bit (aliases for common UI elements) ---
-        desc = (description or "").lower()
-        alias = {
-            "click search box": "search",
-            "search box": "search",
-            "searchbar": "search",
-            "search bar": "search",
-            "google search": "search",
-            "click search": "search",
-            "click address bar": "address bar",
-            "address bar": "address bar",
-            "url bar": "address bar",
-            "omnibox": "address bar",
-            "vscode explorer": "Explorer",
-            "explorer icon": "Explorer",
-            "new file": "New File",
-            "new file button": "New File",
-            "file name field": "File Name",
-            "filename field": "File Name",
-        }
-        query = description
-        for k, v in alias.items():
-            if k in desc:
-                query = v
-                break
+        # Prepare a short query to improve detection
+        query = description or ""
+        try:
+            if self._rewrite_fn:
+                rq = self._rewrite_fn(description)
+                if isinstance(rq, str) and rq.strip():
+                    query = rq
+        except Exception as e:
+            logger.debug("rewrite_ui_query failed: %s", e)
+            # fallback to local cleanup
+            query = self._local_rewrite_ui_query(description)
 
-        # --- Let adapter detect ---
+        # Try detector call with both text keys (some adapters accept different names)
         try:
             res = det.detect({"image_path": shot, "text": query})
         except TypeError:
-            # Some adapter versions might accept positional args
-            res = det.detect({"image_path": shot, "description": query})
+            try:
+                res = det.detect({"image_path": shot, "description": query})
+            except Exception as e:
+                logger.debug("Detection error (2): %s", e)
+                return None
         except Exception as e:
-            logger.debug("Detection error: %s", e)
+            logger.debug("Detection error (1): %s", e)
             return None
 
+        # Normalize response into dict if adapter returned something else
         if not isinstance(res, dict):
             # maybe direct coordinate or list
-            parsed = _parse_position_raw(res)
+            parsed = None
+            try:
+                # try parse "x,y" or "[x,y]" style
+                nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", str(res))]
+                if len(nums) >= 2:
+                    parsed = (nums[0], nums[1])
+            except Exception:
+                parsed = None
+
             if parsed:
-                nx, ny = normalize_coordinates(parsed, shot)
-                return [nx - 12, ny - 12, 24, 24]
+                # create small adaptive bbox from point
+                cx, cy = int(parsed[0]), int(parsed[1])
+                w = max(30, int(pyautogui.size().width * 0.03))
+                h = max(20, int(pyautogui.size().height * 0.03))
+                return [cx - w // 2, cy - h // 2, w, h]
             return None
 
-        # If OSAtlasAdapter returned a structured dict:
+        # If the adapter returned a structured dict, prefer bbox
         bbox = res.get("bbox")
         dtype = res.get("type")
-        conf = float(res.get("confidence", 0.0))
+        conf = float(res.get("confidence", 0.0) or 0.0)
 
-        # Ignore pure center fallback as "no usable detection"
-        if dtype == "center_fallback":
-            logger.warning(
-                "Detection center_fallback for '%s' -> treating as no bbox.", query
-            )
-            return None
+        # If bbox exists and looks sane (x,y,w,h)
+        if bbox and len(bbox) >= 4:
+            try:
+                x, y, w, h = bbox[:4]
+                # If values are x1,y1,x2,y2 convert to x,y,w,h
+                # Heuristic: if w > 2000 or h > 2000 then probably x2/y2 form
+                if (w > 2000) or (h > 2000) or (int(x) < 0) or (int(y) < 0):
+                    # assume [x1,y1,x2,y2] format
+                    x1, y1, x2, y2 = bbox[:4]
+                    x, y, w, h = int(x1), int(y1), int(max(1, x2 - x1)), int(max(1, y2 - y1))
+                else:
+                    x, y, w, h = int(x), int(y), int(max(1, w)), int(max(1, h))
+                return [x, y, w, h]
+            except Exception:
+                logger.debug("Failed to normalize returned bbox: %s", bbox)
 
-        if bbox and len(bbox) >= 4 and (conf >= 0.3 or dtype in ("osatlas_bbox", "ocr_text_match")):
-            x, y, w, h = bbox[:4]
-            return [int(x), int(y), int(max(1, w)), int(max(1, h))]
-
-        # if there is "point" field only
+        # If no bbox but there is a point: create adaptive bbox
         point = res.get("point")
-        if point:
-            parsed = _parse_position_raw(point)
-            if parsed:
-                nx, ny = normalize_coordinates(parsed, shot)
-                return [nx - 12, ny - 12, 24, 24]
+        if point and isinstance(point, (list, tuple)) and len(point) >= 2:
+            try:
+                cx, cy = int(point[0]), int(point[1])
+                screen_w, screen_h = pyautogui.size()
+                # box size ~ 3% of screen width/height, clamped
+                bw = max(28, int(screen_w * 0.03))
+                bh = max(20, int(screen_h * 0.03))
+                return [cx - bw // 2, cy - bh // 2, bw, bh]
+            except Exception:
+                logger.debug("Failed to use point -> bbox from detector: %s", point)
 
+        # If adapter returned raw text that may include coords, try to parse
+        raw = ""
+        for key in ("raw_output", "raw", "response", "bbox", "text"):
+            if isinstance(res.get(key), str) and res.get(key).strip():
+                raw = res.get(key)
+                break
+        if not raw:
+            raw = str(res.get("raw") or res.get("response") or "")
+
+        # Try extract four numbers from raw formatted like [x1,y1,x2,y2] or "x1,y1,x2,y2"
+        try:
+            nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", raw)]
+            if len(nums) >= 4:
+                x1, y1, x2, y2 = nums[:4]
+                x, y, w, h = int(x1), int(y1), int(max(1, x2 - x1)), int(max(1, y2 - y1))
+                return [x, y, w, h]
+        except Exception:
+            pass
+
+        # Last resort: attempt to parse a single point in raw text
+        try:
+            nums = [float(n) for n in re.findall(r"-?\d+\.?\d*", raw)]
+            if len(nums) >= 2:
+                cx, cy = int(nums[0]), int(nums[1])
+                screen_w, screen_h = pyautogui.size()
+                bw = max(28, int(screen_w * 0.03))
+                bh = max(20, int(screen_h * 0.03))
+                return [cx - bw // 2, cy - bh // 2, bw, bh]
+        except Exception:
+            pass
+
+        # Finally: no usable detection
         return None
 
     # ====================================================================
@@ -1369,13 +1484,6 @@ class ExecutorAgent:
         """
         Interpret a natural-language step description and convert it into a
         low-level event structure for PyAutoGUIAdapter.
-
-        Returns dict like:
-          {"event": "click"}
-          {"event": "type", "text": "hello"}
-          {"event": "keypress", "key": "enter"}
-          {"event": "scroll", "direction": "down"}
-          {"event": "hotkey", "keys": ["ctrl", "a"]}
         """
         import re
 
@@ -1387,32 +1495,25 @@ class ExecutorAgent:
         if m:
             return {"event": "type", "text": m.group(1)}
 
-        # Generic "Type" with quotes somewhere
         m2 = re.search(r"['\"]([^'\"]+)['\"]", desc)
         if "type" in low and m2:
             return {"event": "type", "text": m2.group(1)}
 
-        # PRESS ENTER
         if "press enter" in low or low == "enter":
             return {"event": "keypress", "key": "enter"}
 
-        # BACKSPACE
         if "backspace" in low:
             return {"event": "keypress", "key": "backspace"}
 
-        # DELETE
         if "delete" in low and "backspace" not in low:
             return {"event": "keypress", "key": "delete"}
 
-        # SELECT ALL
         if "select all" in low or "ctrl+a" in low:
             return {"event": "hotkey", "keys": ["ctrl", "a"]}
 
-        # PASTE
         if "paste" in low or "ctrl+v" in low:
             return {"event": "hotkey", "keys": ["ctrl", "v"]}
 
-        # ARROWS
         if "arrow left" in low:
             return {"event": "keypress", "key": "left"}
         if "arrow right" in low:
@@ -1422,23 +1523,19 @@ class ExecutorAgent:
         if "arrow down" in low:
             return {"event": "keypress", "key": "down"}
 
-        # SCROLL
         if "scroll down" in low:
             return {"event": "scroll", "direction": "down"}
         if "scroll up" in low:
             return {"event": "scroll", "direction": "up"}
 
-        # Double / right click
         if "double click" in low:
             return {"event": "double_click"}
         if "right click" in low or "context menu" in low:
             return {"event": "right_click"}
 
-        # Generic clicks (click <something>, open file, etc.)
         if "click" in low or "open " in low or "select " in low:
             return {"event": "click"}
 
-        # Wait / noop
         if "wait" in low or "pause" in low or low in ("noop", "no-op"):
             return {"event": "noop"}
 
@@ -1471,7 +1568,6 @@ class ExecutorAgent:
                 "error": "no_executor_adapter",
             }
 
-        # Map event_spec to adapter step format
         event = event_spec.get("event")
         text = event_spec.get("text")
         key = event_spec.get("key")
@@ -1495,7 +1591,6 @@ class ExecutorAgent:
         try:
             adapter_result = exec_adapter.execute(step_for_adapter)
         except TypeError:
-            # older versions may accept slightly different format – best effort
             adapter_result = exec_adapter.execute(step_for_adapter)
         except Exception as e:
             logger.exception("Executor adapter error: %s", e)
@@ -1526,9 +1621,6 @@ class ExecutorAgent:
     # SPECIAL SYSTEM ACTIONS
     # ====================================================================
     def _handle_open_terminal(self, step: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Open a system terminal window in the user's HOME directory.
-        """
         desc = (step.get("description") or "").strip()
         logger.info("Handling special step: %s", desc)
 
@@ -1582,9 +1674,6 @@ class ExecutorAgent:
         }
 
     def _handle_open_browser(self, step: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Open Chrome / browser with Google, then validate visually.
-        """
         desc = (step.get("description") or "").strip()
         logger.info("Handling special step: %s", desc)
 
@@ -1674,14 +1763,6 @@ class ExecutorAgent:
         max_attempts: Optional[int] = None,
         original_prompt: Optional[str] = None,
     ) -> str:
-        """
-        Core execution loop for a single step.
-        - Uses detection + executor adapter + validator.
-        - Retries locally.
-        - Escalates to planner if still failing.
-        Returns YAML with keys: execution, validation, escalate, (optional replan)
-        """
-
         validator_agent = validator_agent or self.validator
         max_attempts = max_attempts or self.max_attempts
 
@@ -1690,7 +1771,7 @@ class ExecutorAgent:
         step_id = step.get("step_id", 0)
         low = description.lower().strip()
 
-        # Special-case handlers (still generic)
+        # Special-case handlers
         if low.startswith("open terminal"):
             result = self._handle_open_terminal(step)
             return yaml.safe_dump(result, sort_keys=False)
@@ -1699,11 +1780,6 @@ class ExecutorAgent:
             result = self._handle_open_browser(step)
             return yaml.safe_dump(result, sort_keys=False)
 
-        
-        
-        # =========================
-        # STRICT EXECUTION LOOP  (FIXED)
-        # =========================
         attempt = 0
         last_execution = None
         last_validation = None
@@ -1716,9 +1792,7 @@ class ExecutorAgent:
             shot = _screenshot(self.output_dir, "shot")
             bbox = self._detect_bbox(description, image_path=shot)
 
-            # =========================
-            # STRICT – bbox not found → mark failed attempt (NO ACTION)
-            # =========================
+            # No bbox found: mark attempt failed (strict)
             if bbox is None:
                 logger.warning("[STRICT] No bbox found → marking attempt as failed without event.")
 
@@ -1738,10 +1812,8 @@ class ExecutorAgent:
                 logger.debug("→ Validation (no bbox): %s", validation)
                 time.sleep(0.8)
                 continue
-            
-            # =========================
-            # NORMAL STRICT EXECUTION
-            # =========================
+
+            # Normal strict execution
             event_spec = self._map_description_to_event(description)
             exec_result = self._perform_via_adapter(bbox, event_spec)
             last_execution = exec_result
@@ -1761,14 +1833,13 @@ class ExecutorAgent:
             logger.debug("Step attempt %d failed: %s", attempt, validation)
             time.sleep(1.1)
 
-        # === all attempts failed → escalate to planner
+        # All attempts failed → escalate to planner
         return yaml.safe_dump(
             {"execution": {"attempts": attempt, "last": last_execution},
              "validation": last_validation,
              "escalate": True},
             sort_keys=False,
         )
-
 
     # ====================================================================
     # BACKWARDS + ORCHESTRATOR-COMPATIBLE ENTRYPOINT
@@ -1783,17 +1854,6 @@ class ExecutorAgent:
         original_prompt: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """
-        Supports both:
-            run_step(step=<dict>)
-        AND
-            run_step(step_id=1, step_description="Click search box")
-
-        Returns a dict with at least:
-            - execution: {attempts, last}
-            - validation: {validation_status, ...}
-            - escalate: bool
-        """
         if step is None:
             step = {
                 "step_id": step_id or 1,
@@ -1824,4 +1884,3 @@ class ExecutorAgent:
                 },
                 "raw": yaml_result,
             }
-

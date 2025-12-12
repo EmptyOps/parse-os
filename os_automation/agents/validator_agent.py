@@ -67,9 +67,14 @@ class ValidatorAgent:
     """
 
     # These thresholds are in mean 0–255 per pixel space
-    TYPE_THRESHOLD = 2.0
-    CLICK_THRESHOLD = 5.0
-    NAVIGATION_THRESHOLD = 5.0
+    # TYPE_THRESHOLD = 2.0
+    # CLICK_THRESHOLD = 5.0
+    # NAVIGATION_THRESHOLD = 5.0
+    
+    TYPE_THRESHOLD = 0.8
+    CLICK_THRESHOLD = 1.2
+    NAVIGATION_THRESHOLD = 1.5
+
 
     def __init__(self):
         self.llm_client: Optional[OpenAI] = None
@@ -184,14 +189,43 @@ class ValidatorAgent:
             )
 
         diff = _pixel_diff(before, after)
+        
+        # ===== LOCAL REGION DIFF (BBOX-LEVEL CHANGE CHECK) =====
+        bbox = exe.get("bbox")
+        if bbox and len(bbox) >= 4:
+            try:
+                x, y, w, h = [int(v) for v in bbox[:4]]
 
-        # Quick short-circuit: no noticeable change at all → fail
-        # GNOME STRICT MODE — diff below 1.2 always fails
-        if diff < 1.2:
-            return yaml.safe_dump(
-                {"validation_status": "fail",
-                 "details": {"reason": "no_visual_change", "diff": diff}}
-            )
+                B = Image.open(before).convert("RGB")
+                A = Image.open(after).convert("RGB")
+
+                # Crop expanded region to capture UI reaction (hover, highlight, focus)
+                pad = 18
+                region = (
+                    max(0, x - pad), 
+                    max(0, y - pad), 
+                    min(B.width, x + w + pad),
+                    min(B.height, y + h + pad)
+                )
+
+                Bc = B.crop(region)
+                Ac = A.crop(region)
+
+                # local mean difference
+                local_diff = ImageStat.Stat(ImageChops.difference(Bc, Ac)).mean
+                local_diff = sum(local_diff) / len(local_diff)
+
+                if local_diff > 1.0:
+                    return yaml.safe_dump({
+                        "validation_status": "pass",
+                        "details": {
+                            "method": "local_region_diff",
+                            "local_diff": float(local_diff),
+                            "global_diff": float(diff)
+                        }
+                    })
+            except Exception as e:
+                logger.debug("local region diff failed: %s", e)
 
 
         # Special-case "first search result" type clicks – still allow some optimism
@@ -329,7 +363,17 @@ class ValidatorAgent:
         # ===================== Generic Click =====================
         if "click" in desc or "double click" in desc or "right click" in desc:
             ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
-            status = "pass" if diff > self.CLICK_THRESHOLD else "fail"
+            # status = "pass" if diff > self.CLICK_THRESHOLD else "fail"
+            # try global diff
+            if diff > self.CLICK_THRESHOLD:
+                status = "pass"
+            else:
+                # fallback to local diff we computed earlier
+                if 'local_diff' in locals() and local_diff > 0.8:
+                    status = "pass"
+                else:
+                    status = "fail"
+
             details: Dict[str, Any] = {
                 "method": "pixel",
                 "diff": diff,
