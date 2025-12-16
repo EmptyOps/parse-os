@@ -1166,6 +1166,8 @@
 #                 "raw": yaml_result
 #             }
 
+
+
 # os_automation/agents/executor_agent.py
 import os
 import time
@@ -1629,7 +1631,35 @@ class ExecutorAgent:
         system = platform.system()
 
         try:
+            # if system == "Linux":
+            #     proc = None
+            #     for cmd in (
+            #         ["gnome-terminal"],
+            #         ["konsole"],
+            #         ["x-terminal-emulator"],
+            #         ["xfce4-terminal"],
+            #     ):
+            #         try:
+            #             proc = subprocess.Popen(cmd, cwd=home)
+            #             break
+            #         except Exception:
+            #             continue
+            #     else:
+            #         proc = subprocess.Popen(["xterm"], cwd=home)
+
+            #     # ⏳ allow window to appear
+            #     time.sleep(1.2)
+
+            #     # ✅ FORCE FOCUS TO NEW TERMINAL WINDOW
+            #     try:
+            #         subprocess.Popen(["wmctrl", "-a", "Terminal"])
+            #         time.sleep(0.3)
+            #     except Exception as e:
+            #         logger.warning("wmctrl not available or failed: %s", e)
+            
             if system == "Linux":
+                proc = None
+
                 for cmd in (
                     ["gnome-terminal"],
                     ["konsole"],
@@ -1637,23 +1667,54 @@ class ExecutorAgent:
                     ["xfce4-terminal"],
                 ):
                     try:
-                        subprocess.Popen(cmd, cwd=home)
+                        proc = subprocess.Popen(cmd, cwd=home)
                         break
                     except Exception:
                         continue
                 else:
-                    subprocess.Popen(["xterm"], cwd=home)
+                    proc = subprocess.Popen(["xterm"], cwd=home)
+
+                # ⏳ Wait for window to register
+                time.sleep(1.5)
+
+                # ✅ HARD GUARANTEE: focus the terminal WE just opened
+                try:
+                    pid = proc.pid
+
+                    # Find window ID that belongs to this PID
+                    wmctrl_out = subprocess.check_output(
+                        ["wmctrl", "-lp"], text=True
+                    )
+
+                    target_wid = None
+                    for line in wmctrl_out.splitlines():
+                        parts = line.split()
+                        if len(parts) >= 3 and parts[2] == str(pid):
+                            target_wid = parts[0]
+                            break
+
+                    if target_wid:
+                        subprocess.run(["wmctrl", "-i", "-R", target_wid])
+                        time.sleep(0.3)
+                    else:
+                        logger.warning("Could not find window for terminal PID %s", pid)
+
+                except Exception as e:
+                    logger.error("Terminal focus by PID failed: %s", e)
+
 
             elif system == "Darwin":
                 subprocess.Popen(["open", "-a", "Terminal"], cwd=home)
+                time.sleep(1.2)
 
             elif system.startswith("Win"):
                 subprocess.Popen(["cmd.exe"], cwd=home)
+                time.sleep(1.2)
 
-            time.sleep(1.5)
             after = _screenshot(self.output_dir, "after")
 
             exec_res = {"status": "success", "before": before, "after": after}
+
         except Exception as e:
             after = _screenshot(self.output_dir, "after")
             exec_res = {
@@ -1672,6 +1733,7 @@ class ExecutorAgent:
             "validation": validation,
             "escalate": validation.get("validation_status") != "pass",
         }
+
 
     def _handle_open_browser(self, step: Dict[str, Any]) -> Dict[str, Any]:
         desc = (step.get("description") or "").strip()

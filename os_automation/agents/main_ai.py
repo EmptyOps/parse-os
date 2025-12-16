@@ -1,6 +1,7 @@
 # os_automation/agents/main_ai.py
 
 import os
+import platform
 import yaml
 import logging
 from typing import List, Dict, Any, Optional
@@ -56,12 +57,25 @@ class MainAIAgent:
         Use an LLM to convert a natural-language task into micro-steps.
         MUST produce atomic actions, never combined steps.
         """
+        system_os = platform.system()  # Linux / Darwin / Windows
         
         # 🔥 REQUIRED FOR OBSERVATION-DRIVEN PLANNING
         self.original_prompt = user_prompt
         self.history = []
 
         system_prompt = """
+        
+SYSTEM CONTEXT
+--------------
+- Current operating system: {system_os}
+
+COMMAND RULES
+-------------
+- Linux screenshot command: gnome-screenshot -f <path>
+- macOS screenshot command: screencapture <path>
+- Windows screenshot command: powershell screenshot / snipping tool
+
+
 You are an OS automation planner for a 3-agent system:
 - Main planner (you)
 - Executor (does clicks/typing using PyAutoGUI + OS-Atlas)
@@ -139,7 +153,6 @@ RULES
 - Always wrap typed text in single quotes: Type 'hello.py'
 - Be specific: "Click New File button" instead of "Click button".
 - Do NOT invent irrelevant apps (no random browser open if user asked for terminal).
-- Do NOT mention the OS (Windows/Linux/macOS) unless user explicitly does.
 
 OUTPUT FORMAT (VERY IMPORTANT)
 ------------------------------
