@@ -1487,6 +1487,7 @@ class ExecutorAgent:
         Interpret a natural-language step description and convert it into a
         low-level event structure for PyAutoGUIAdapter.
         """
+        
         import re
 
         desc = (description or "").strip()
@@ -1631,32 +1632,6 @@ class ExecutorAgent:
         system = platform.system()
 
         try:
-            # if system == "Linux":
-            #     proc = None
-            #     for cmd in (
-            #         ["gnome-terminal"],
-            #         ["konsole"],
-            #         ["x-terminal-emulator"],
-            #         ["xfce4-terminal"],
-            #     ):
-            #         try:
-            #             proc = subprocess.Popen(cmd, cwd=home)
-            #             break
-            #         except Exception:
-            #             continue
-            #     else:
-            #         proc = subprocess.Popen(["xterm"], cwd=home)
-
-            #     # ⏳ allow window to appear
-            #     time.sleep(1.2)
-
-            #     # ✅ FORCE FOCUS TO NEW TERMINAL WINDOW
-            #     try:
-            #         subprocess.Popen(["wmctrl", "-a", "Terminal"])
-            #         time.sleep(0.3)
-            #     except Exception as e:
-            #         logger.warning("wmctrl not available or failed: %s", e)
-            
             if system == "Linux":
                 proc = None
 
@@ -1667,41 +1642,35 @@ class ExecutorAgent:
                     ["xfce4-terminal"],
                 ):
                     try:
-                        proc = subprocess.Popen(cmd, cwd=home)
+                        proc = subprocess.Popen(
+                            cmd,
+                            cwd=home,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True
+                        )
                         break
                     except Exception:
                         continue
                 else:
-                    proc = subprocess.Popen(["xterm"], cwd=home)
-
-                # ⏳ Wait for window to register
-                time.sleep(1.5)
-
-                # ✅ HARD GUARANTEE: focus the terminal WE just opened
-                try:
-                    pid = proc.pid
-
-                    # Find window ID that belongs to this PID
-                    wmctrl_out = subprocess.check_output(
-                        ["wmctrl", "-lp"], text=True
+                    proc = subprocess.Popen(
+                        ["xterm"],
+                        cwd=home,
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True
                     )
 
-                    target_wid = None
-                    for line in wmctrl_out.splitlines():
-                        parts = line.split()
-                        if len(parts) >= 3 and parts[2] == str(pid):
-                            target_wid = parts[0]
-                            break
+                # ⏳ allow terminal window to appear
+                time.sleep(1.2)
 
-                    if target_wid:
-                        subprocess.run(["wmctrl", "-i", "-R", target_wid])
-                        time.sleep(0.3)
-                    else:
-                        logger.warning("Could not find window for terminal PID %s", pid)
-
-                except Exception as e:
-                    logger.error("Terminal focus by PID failed: %s", e)
-
+                # 🔑 HARD GUI FOCUS (this is what your reference repo relies on)
+                import pyautogui
+                screen_w, screen_h = pyautogui.size()
+                pyautogui.click(screen_w // 2, screen_h // 2)
+                time.sleep(0.2)
 
             elif system == "Darwin":
                 subprocess.Popen(["open", "-a", "Terminal"], cwd=home)
@@ -1832,6 +1801,62 @@ class ExecutorAgent:
         description = step.get("description") or ""
         step_id = step.get("step_id", 0)
         low = description.lower().strip()
+        
+        
+        # ============================================================
+        # TERMINAL MODE SHORT-CIRCUIT (CRITICAL FIX)
+        # ============================================================
+        is_terminal_type = low.startswith("type ")
+        is_terminal_enter = ("press enter" in low or low == "enter")
+
+        if is_terminal_type or is_terminal_enter:
+            logger.info("Terminal input detected → bypassing bbox detection")
+
+            before = _screenshot(self.output_dir, "before_terminal")
+
+            try:
+                # DO NOT click anywhere
+                # DO NOT detect bbox
+                if is_terminal_type:
+                    m = re.search(r"['\"]([^'\"]+)['\"]", description)
+                    if m:
+                        pyautogui.write(m.group(1), interval=0.03)
+
+                if is_terminal_enter:
+                    pyautogui.press("enter")
+
+                after = _screenshot(self.output_dir, "after_terminal")
+
+                exec_res = {
+                    "status": "success",
+                    "before": before,
+                    "after": after,
+                    "event": "terminal_input",
+                }
+
+            except Exception as e:
+                after = _screenshot(self.output_dir, "after_terminal")
+                exec_res = {
+                    "status": "failed",
+                    "before": before,
+                    "after": after,
+                    "error": str(e),
+                }
+
+            exec_yaml = yaml.safe_dump({"step": step, "execution": exec_res}, sort_keys=False)
+            validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+            validation = yaml.safe_load(validation_yaml)
+
+            return yaml.safe_dump(
+                {
+                    "execution": {"attempts": 1, "last": exec_res},
+                    "validation": validation,
+                    "escalate": validation.get("validation_status") != "pass",
+                },
+                sort_keys=False,
+            )
+
+
 
         # Special-case handlers
         if low.startswith("open terminal"):
