@@ -176,7 +176,7 @@ steps:
   - step_id: 1
     description: "Open the browser"
   - step_id: 2
-    description: "Click search box"
+    description: "Click browser address bar"
   - step_id: 3
     description: "Type 'dogs'"
   - step_id: 4

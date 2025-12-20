@@ -346,19 +346,19 @@ class ValidatorAgent:
             )
 
         # ===================== Special Search Box / Omnibox =====================
-        if any(
-            k in desc for k in ("click search box", "search box", "click address bar")
-        ):
-            return yaml.safe_dump(
-                {
-                    "validation_status": "pass",
-                    "details": {
-                        "method": "special_case",
-                        "reason": "google_search_box_clicked",
-                        "diff": diff,
-                    },
-                }
-            )
+        # if any(
+        #     k in desc for k in ("click search box", "search box", "click address bar")
+        # ):
+        #     return yaml.safe_dump(
+        #         {
+        #             "validation_status": "pass",
+        #             "details": {
+        #                 "method": "special_case",
+        #                 "reason": "google_search_box_clicked",
+        #                 "diff": diff,
+        #             },
+        #         }
+        #     )
 
         # ===================== Generic Click =====================
         if "click" in desc or "double click" in desc or "right click" in desc:

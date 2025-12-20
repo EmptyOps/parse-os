@@ -1239,6 +1239,8 @@ class ExecutorAgent:
         output_dir: str = None,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     ):
+        self.execution_mode = "gui"  # or "terminal"
+
         self.validator = ValidatorAgent()
 
         self.default_detection = default_detection
@@ -1298,8 +1300,9 @@ class ExecutorAgent:
         desc = (description or "").lower()
         # common mappings
         mapping = {
+            "search box": "address bar",
+            "search": "address bar",
             "address bar": "address bar",
-            "omnibox": "address bar",
             "search box": "search",
             "searchbar": "search",
             "search bar": "search",
@@ -1624,6 +1627,8 @@ class ExecutorAgent:
     # SPECIAL SYSTEM ACTIONS
     # ====================================================================
     def _handle_open_terminal(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        self.execution_mode = "terminal"
+
         desc = (step.get("description") or "").strip()
         logger.info("Handling special step: %s", desc)
 
@@ -1705,6 +1710,8 @@ class ExecutorAgent:
 
 
     def _handle_open_browser(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        self.execution_mode = "gui"
+
         desc = (step.get("description") or "").strip()
         logger.info("Handling special step: %s", desc)
 
@@ -1806,8 +1813,15 @@ class ExecutorAgent:
         # ============================================================
         # TERMINAL MODE SHORT-CIRCUIT (CRITICAL FIX)
         # ============================================================
-        is_terminal_type = low.startswith("type ")
-        is_terminal_enter = ("press enter" in low or low == "enter")
+        is_terminal_type = (
+            self.execution_mode == "terminal" and low.startswith("type ")
+        )
+
+        is_terminal_enter = (
+            self.execution_mode == "terminal"
+            and ("press enter" in low or low == "enter")
+        )
+
 
         if is_terminal_type or is_terminal_enter:
             logger.info("Terminal input detected → bypassing bbox detection")
