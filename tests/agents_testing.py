@@ -15,14 +15,16 @@ def main():
         # "Click on 'File' menu in VS Code bbox and scroll up",
         # "Open Terminal and list out the files",
         # "Open browser and search Python tutorial",
-        "Search youtube in browser and click on first link",
-        # "Open new visual studio code window",
+        # "Search youtube in browser and click on first link",
+        "Search youtube in browser and click on Youtube icone",
+        # "Open new visual studio code window", 
         # "Open new visual studio code window and create python script name hello.py",
         # "Click on 'file' menu in VS code",
         # "Click on 'Edit' menu in VS code",
         # "Create python.py script on Documents folder",
         # "take a screenshot of current screen and save it as imageTest.png on Documents folder",
         # "Open Documents/Vedanshi folder in the file explorer",
+        # "Open Calculator and do sum of 10 and 500",
 
         image_path=screenshot_path
     )

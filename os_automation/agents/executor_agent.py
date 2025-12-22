@@ -1479,6 +1479,12 @@ class ExecutorAgent:
         except Exception:
             pass
 
+
+        screen_w, screen_h = pyautogui.size()
+        if x < 0 or y < 0 or x + w > screen_w or y + h > screen_h:
+            logger.warning("Discarding out-of-screen bbox")
+            return None
+    
         # Finally: no usable detection
         return None
 
@@ -1916,20 +1922,50 @@ class ExecutorAgent:
 
             # Normal strict execution
             event_spec = self._map_description_to_event(description)
-            exec_result = self._perform_via_adapter(bbox, event_spec)
-            last_execution = exec_result
+            
+            # --- DYNAMIC CLICK STRATEGY ---
+            click_offsets = [(0.3), (0.5), (0.7)]  # top, center, bottom
+            last_validation = None
 
-            exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
-            validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-            validation = yaml.safe_load(validation_yaml)
-            last_validation = validation
+            for ratio in click_offsets:
+                # adjust bbox Y dynamically
+                x, y, w, h = bbox
+                adjusted_bbox = [x, y + int(h * (ratio - 0.5)), w, int(h * 0.2)]
 
-            if validation.get("validation_status") == "pass":
-                return yaml.safe_dump(
-                    {"execution": {"attempts": attempt, "last": last_execution},
-                     "validation": validation, "escalate": False},
-                    sort_keys=False,
+                exec_result = self._perform_via_adapter(adjusted_bbox, event_spec)
+                last_execution = exec_result
+
+                exec_yaml = yaml.safe_dump(
+                    {"step": step, "execution": exec_result},
+                    sort_keys=False
                 )
+                validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+                validation = yaml.safe_load(validation_yaml)
+                last_validation = validation
+
+                if validation.get("validation_status") == "pass":
+                    return yaml.safe_dump(
+                        {
+                            "execution": {"attempts": attempt, "last": last_execution},
+                            "validation": validation,
+                            "escalate": False,
+                        },
+                        sort_keys=False,
+                    )
+            # exec_result = self._perform_via_adapter(bbox, event_spec)
+            # last_execution = exec_result
+
+            # exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
+            # validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+            # validation = yaml.safe_load(validation_yaml)
+            # last_validation = validation
+
+            # if validation.get("validation_status") == "pass":
+            #     return yaml.safe_dump(
+            #         {"execution": {"attempts": attempt, "last": last_execution},
+            #          "validation": validation, "escalate": False},
+            #         sort_keys=False,
+            #     )
 
             logger.debug("Step attempt %d failed: %s", attempt, validation)
             time.sleep(1.1)

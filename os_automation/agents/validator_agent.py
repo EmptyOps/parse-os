@@ -365,7 +365,7 @@ class ValidatorAgent:
             ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
             # status = "pass" if diff > self.CLICK_THRESHOLD else "fail"
             # try global diff
-            if diff > self.CLICK_THRESHOLD:
+            if diff > self.CLICK_THRESHOLD or diff > 0.5:
                 status = "pass"
             else:
                 # fallback to local diff we computed earlier
