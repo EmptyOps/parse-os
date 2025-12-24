@@ -36,6 +36,8 @@ import time
 import logging
 from typing import Dict, Any, List
 
+import pyautogui
+
 from os_automation.tools.pyautogui.py_auto_tool import PyAutoTool
 from os_automation.core.adapters import BaseAdapter
 
@@ -104,8 +106,12 @@ class PyAutoGUIAdapter(BaseAdapter):
             if event == "click":
                 self.tool.click(cx, cy)
 
+            # elif event == "type":
+            #     self.tool.type_text(cx, cy, text or "")
+            
             elif event == "type":
-                self.tool.type_text(cx, cy, text or "")
+                pyautogui.write(text or "", interval=0.03)
+
 
             elif event == "keypress":
                 # key could be: enter, backspace, delete, left, right, up, down...

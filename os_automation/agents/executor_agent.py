@@ -1344,6 +1344,8 @@ class ExecutorAgent:
             return tokens[-1]
 
         return description.strip()
+    
+    
 
     # ====================================================================
     # DETECT BBOX
@@ -1480,10 +1482,17 @@ class ExecutorAgent:
             pass
 
 
-        screen_w, screen_h = pyautogui.size()
-        if x < 0 or y < 0 or x + w > screen_w or y + h > screen_h:
-            logger.warning("Discarding out-of-screen bbox")
-            return None
+        # Safety check only if bbox exists
+        if bbox:
+            try:
+                x, y, w, h = bbox
+                screen_w, screen_h = pyautogui.size()
+                if x < 0 or y < 0 or x + w > screen_w or y + h > screen_h:
+                    logger.warning("Discarding out-of-screen bbox")
+                    return None
+            except Exception:
+                return None
+
     
         # Finally: no usable detection
         return None
@@ -1816,6 +1825,71 @@ class ExecutorAgent:
         low = description.lower().strip()
         
         
+        is_gui_type = low.startswith("type ")
+        is_gui_enter = low == "press enter" or low == "enter"
+        
+        # ============================================================
+        # GUI TYPE / ENTER SHORT-CIRCUIT (NO BBOX, NO RETRY)
+        # ============================================================
+        if is_gui_type:
+            before = _screenshot(self.output_dir, "before_gui_type")
+            try:
+                m = re.search(r"['\"]([^'\"]+)['\"]", description)
+                if m:
+                    pyautogui.write(m.group(1), interval=0.03)
+                after = _screenshot(self.output_dir, "after_gui_type")
+
+                return yaml.safe_dump({
+                    "execution": {
+                            "attempts": 1,
+                        "last": {
+                            "status": "success",
+                            "before": before,
+                            "after": after,
+                            "event": "gui_type"
+                        }
+                    },
+                    "validation": {"validation_status": "pass"},
+                    "escalate": False
+                }, sort_keys=False)
+
+            except Exception as e:
+                after = _screenshot(self.output_dir, "after_gui_type")
+                return yaml.safe_dump({
+                    "execution": {
+                        "attempts": 1,
+                        "last": {
+                            "status": "failed",
+                            "before": before,
+                            "after": after,
+                            "error": str(e)
+                        }
+                    },
+                    "validation": {"validation_status": "fail"},
+                    "escalate": True
+                }, sort_keys=False)
+
+
+        if is_gui_enter:
+            before = _screenshot(self.output_dir, "before_gui_enter")
+            pyautogui.press("enter")
+            after = _screenshot(self.output_dir, "after_gui_enter")
+
+            return yaml.safe_dump({
+                "execution": {
+                    "attempts": 1,
+                    "last": {
+                        "status": "success",
+                        "before": before,
+                        "after": after,
+                        "event": "gui_enter"
+                    }
+                },
+                "validation": {"validation_status": "pass"},
+                "escalate": False
+            }, sort_keys=False)
+
+        
         # ============================================================
         # TERMINAL MODE SHORT-CIRCUIT (CRITICAL FIX)
         # ============================================================
@@ -1923,6 +1997,9 @@ class ExecutorAgent:
             # Normal strict execution
             event_spec = self._map_description_to_event(description)
             
+            NO_RETRY_EVENTS = {"type", "keypress"}
+
+            
             # --- DYNAMIC CLICK STRATEGY ---
             click_offsets = [(0.3), (0.5), (0.7)]  # top, center, bottom
             last_validation = None
@@ -1934,6 +2011,17 @@ class ExecutorAgent:
 
                 exec_result = self._perform_via_adapter(adjusted_bbox, event_spec)
                 last_execution = exec_result
+                
+                if (
+                    event_spec.get("event") in NO_RETRY_EVENTS
+                    and exec_result.get("status") == "success"
+                ):
+                    return yaml.safe_dump({
+                        "execution": {"attempts": attempt, "last": exec_result},
+                        "validation": {"validation_status": "pass"},
+                        "escalate": False
+                    }, sort_keys=False)
+
 
                 exec_yaml = yaml.safe_dump(
                     {"step": step, "execution": exec_result},

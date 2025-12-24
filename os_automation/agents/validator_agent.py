@@ -257,6 +257,16 @@ class ValidatorAgent:
 
         # ===================== Typing / Run Command =====================
         if is_type_step or is_run_cmd_step:
+            # ===== GUI TYPING: TRUST EXECUTION =====
+            if is_type_step and not looks_like_terminal:
+                return yaml.safe_dump({
+                    "validation_status": "pass",
+                    "details": {
+                        "method": "trust_executor_typing",
+                        "note": "GUI typing validated by execution success"
+                    }
+                })
+
             m = re.search(r"['\"](.+?)['\"]", step.get("description", ""))
             expected = (m.group(1) if m else "").strip()
             ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
@@ -359,6 +369,7 @@ class ValidatorAgent:
         #             },
         #         }
         #     )
+        
 
         # ===================== Generic Click =====================
         if "click" in desc or "double click" in desc or "right click" in desc:

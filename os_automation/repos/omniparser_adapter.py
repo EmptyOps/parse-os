@@ -18,3 +18,4 @@ class OmniParserAdapter(BaseAdapter):
 
     def validate(self, step):
         return {"validation": "ok"}
+    

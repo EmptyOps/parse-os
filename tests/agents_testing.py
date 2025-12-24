@@ -16,7 +16,8 @@ def main():
         # "Open Terminal and list out the files",
         # "Open browser and search Python tutorial",
         # "Search youtube in browser and click on first link",
-        "Search youtube in browser and click on Youtube icone",
+        # "Search youtube in browser and click on Youtube icone",
+        # "Open file explorer and go to Documents Folder",
         # "Open new visual studio code window", 
         # "Open new visual studio code window and create python script name hello.py",
         # "Click on 'file' menu in VS code",
@@ -24,7 +25,8 @@ def main():
         # "Create python.py script on Documents folder",
         # "take a screenshot of current screen and save it as imageTest.png on Documents folder",
         # "Open Documents/Vedanshi folder in the file explorer",
-        # "Open Calculator and do sum of 10 and 500",
+        # "Open system Calculator and do sum of 10 and 500",
+        "open Youtube in browser and play random music",
 
         image_path=screenshot_path
     )
