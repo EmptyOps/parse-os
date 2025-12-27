@@ -1346,6 +1346,37 @@ class ExecutorAgent:
         return description.strip()
     
     
+    # ====================================================================
+    # a REAL click policy
+    # ====================================================================
+    def _safe_click_point(self, bbox: List[int]) -> List[int]:
+        """
+        Convert bbox to a safe click coordinate.
+        This is the SINGLE source of truth for click safety.
+        """
+        x, y, w, h = bbox
+
+        # Base center
+        cx = x + w * 0.5
+        cy = y + h * 0.5
+
+        # ---- Dynamic heuristics (NO task-specific strings) ----
+
+        # Wide + short → likely input / address bar
+        aspect_ratio = w / max(h, 1)
+
+        if aspect_ratio > 4.0:
+            # Inputs behave better slightly below center
+            cy = y + h * 0.60
+        else:
+            cy = y + h * 0.50
+
+        # ---- Micro jitter (human-like) ----
+        cx += random.randint(-3, 3)
+        cy += random.randint(-2, 2)
+
+        return [int(cx), int(cy)]
+
 
     # ====================================================================
     # DETECT BBOX
@@ -1578,6 +1609,31 @@ class ExecutorAgent:
         exec_adapter = self._get_executor_adapter()
 
         before = _screenshot(self.output_dir, "before")
+        
+        # -------------------------------
+        # 🛡️ Adapter capability validation
+        # -------------------------------
+        event = event_spec.get("event")
+
+        # Adapter must declare supported events
+        supported = getattr(exec_adapter, "SUPPORTED_EVENTS", None)
+
+        if supported is not None and event not in supported:
+            logger.error(
+                "Adapter %s does not support event '%s'. Supported=%s",
+                exec_adapter.__class__.__name__,
+                event,
+                supported,
+            )
+            after = _screenshot(self.output_dir, "after_unsupported_event")
+            return {
+                "status": "failed",
+                "before": before,
+                "after": after,
+                "error": f"unsupported_event:{event}",
+                "event": event,
+            }
+
 
         if not exec_adapter:
             logger.error("No executor adapter configured.")
@@ -1608,6 +1664,7 @@ class ExecutorAgent:
             step_for_adapter["keys"] = keys
         if direction is not None:
             step_for_adapter["direction"] = direction
+            
 
         try:
             adapter_result = exec_adapter.execute(step_for_adapter)
@@ -1806,6 +1863,36 @@ class ExecutorAgent:
             "escalate": validation.get("validation_status") != "pass",
         }
 
+
+    def _handle_open_file_explorer(self, step):
+        system = platform.system()
+        before = _screenshot(self.output_dir, "before")
+
+        try:
+            if system == "Linux":
+                subprocess.Popen(["xdg-open", os.path.expanduser("~")])
+            elif system == "Darwin":
+                subprocess.Popen(["open", os.path.expanduser("~")])
+            elif system.startswith("Win"):
+                subprocess.Popen(["explorer.exe"])
+
+            time.sleep(1.5)
+            after = _screenshot(self.output_dir, "after")
+
+            return {
+                "execution": {"attempts": 1, "last": {"status": "success", "before": before, "after": after}},
+                "validation": {"validation_status": "pass"},
+                "escalate": False
+            }
+
+        except Exception as e:
+            after = _screenshot(self.output_dir, "after")
+            return {
+                "execution": {"attempts": 1, "last": {"status": "failed", "error": str(e)}},
+                "validation": {"validation_status": "fail"},
+                "escalate": True
+            }
+
     # ====================================================================
     # MAIN YAML EXECUTION FOR ONE STEP
     # ====================================================================
@@ -1950,8 +2037,6 @@ class ExecutorAgent:
                 sort_keys=False,
             )
 
-
-
         # Special-case handlers
         if low.startswith("open terminal"):
             result = self._handle_open_terminal(step)
@@ -1960,6 +2045,10 @@ class ExecutorAgent:
         if low in ("open browser", "open the browser") or "open chrome" in low:
             result = self._handle_open_browser(step)
             return yaml.safe_dump(result, sort_keys=False)
+        
+        if low.startswith("open file explorer"):
+            return yaml.safe_dump(self._handle_open_file_explorer(step), sort_keys=False)
+
 
         attempt = 0
         last_execution = None
@@ -1993,67 +2082,39 @@ class ExecutorAgent:
                 logger.debug("→ Validation (no bbox): %s", validation)
                 time.sleep(0.8)
                 continue
-
-            # Normal strict execution
+            
+            
+            
             event_spec = self._map_description_to_event(description)
-            
-            NO_RETRY_EVENTS = {"type", "keypress"}
-
-            
-            # --- DYNAMIC CLICK STRATEGY ---
-            click_offsets = [(0.3), (0.5), (0.7)]  # top, center, bottom
-            last_validation = None
-
-            for ratio in click_offsets:
-                # adjust bbox Y dynamically
-                x, y, w, h = bbox
-                adjusted_bbox = [x, y + int(h * (ratio - 0.5)), w, int(h * 0.2)]
-
-                exec_result = self._perform_via_adapter(adjusted_bbox, event_spec)
-                last_execution = exec_result
-                
-                if (
-                    event_spec.get("event") in NO_RETRY_EVENTS
-                    and exec_result.get("status") == "success"
-                ):
-                    return yaml.safe_dump({
-                        "execution": {"attempts": attempt, "last": exec_result},
-                        "validation": {"validation_status": "pass"},
-                        "escalate": False
-                    }, sort_keys=False)
 
 
-                exec_yaml = yaml.safe_dump(
-                    {"step": step, "execution": exec_result},
-                    sort_keys=False
+            # ---------------- SAFE CLICK POLICY ----------------
+            if event_spec.get("event") == "click":
+                cx, cy = self._safe_click_point(bbox)
+                # event_spec = {
+                #     "event": "click_at",
+                #     "coords": [cx, cy],
+                # }
+                event_spec = {
+                    "event": "click",
+                    "bbox": [cx - 2, cy - 2, 4, 4],  # tiny bbox centered at safe point
+                }
+
+
+            exec_result = self._perform_via_adapter(bbox, event_spec)
+            last_execution = exec_result
+
+            exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
+            validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+            validation = yaml.safe_load(validation_yaml)
+            last_validation = validation
+
+            if validation.get("validation_status") == "pass":
+                return yaml.safe_dump(
+                    {"execution": {"attempts": attempt, "last": last_execution},
+                     "validation": validation, "escalate": False},
+                    sort_keys=False,
                 )
-                validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-                validation = yaml.safe_load(validation_yaml)
-                last_validation = validation
-
-                if validation.get("validation_status") == "pass":
-                    return yaml.safe_dump(
-                        {
-                            "execution": {"attempts": attempt, "last": last_execution},
-                            "validation": validation,
-                            "escalate": False,
-                        },
-                        sort_keys=False,
-                    )
-            # exec_result = self._perform_via_adapter(bbox, event_spec)
-            # last_execution = exec_result
-
-            # exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
-            # validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-            # validation = yaml.safe_load(validation_yaml)
-            # last_validation = validation
-
-            # if validation.get("validation_status") == "pass":
-            #     return yaml.safe_dump(
-            #         {"execution": {"attempts": attempt, "last": last_execution},
-            #          "validation": validation, "escalate": False},
-            #         sort_keys=False,
-            #     )
 
             logger.debug("Step attempt %d failed: %s", attempt, validation)
             time.sleep(1.1)

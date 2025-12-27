@@ -30,6 +30,7 @@
 #         return {"validation": "ok"}
 
 
+
 # os_automation/repos/pyautogui_adapter.py
 import os
 import time
@@ -49,6 +50,17 @@ class PyAutoGUIAdapter(BaseAdapter):
     Adapter wrapping PyAutoTool for: click, type, keypress, hotkey, scroll, screenshot.
     This is the adapter used by ExecutorAgent in the orchestrator.
     """
+    
+    # 🔐 Explicit capability contract
+    SUPPORTED_EVENTS = {
+        "click",
+        "double_click",
+        "type",
+        "keypress",
+        "hotkey",
+        "scroll",
+        "right_click",
+    }
 
     def __init__(self):
         self.tool = PyAutoTool()
@@ -123,6 +135,12 @@ class PyAutoGUIAdapter(BaseAdapter):
 
             elif event == "scroll":
                 self.tool.scroll(cx, cy, direction)
+                
+            elif event == "double_click":
+                self.tool.doubleClick(cx, cy)
+                
+            elif event == "right_click":
+                self.tool.right_click(cx, cy)
 
             else:
                 raise ValueError(f"Unknown event {event}")

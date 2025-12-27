@@ -91,6 +91,12 @@ class PyAutoTool:
         print(f"[DEBUG] 🖱️ scroll({x}, {y}, '{direction}')", flush=True, file=sys.stderr)
         self._move_and_wait(x, y)
         pyautogui.scroll(300 if direction == "up" else -300)
+        
+    def doubleClick(self, x, y):
+        print(f"[DEBUG] 🖱️ double_click({x}, {y}) called via tool_wrapper.py", flush=True, file=sys.stderr)
+        self._move_and_wait(x, y)
+        pyautogui.doubleClick(x, y)
+        time.sleep(self.delay)
 
     def keypress(self, key):
         print(f"[DEBUG] ⌨️ keypress({key})", flush=True, file=sys.stderr)
@@ -99,3 +105,9 @@ class PyAutoTool:
     def hotkey(self, keys):
         print(f"[DEBUG] ⌨️ hotkey({keys})", flush=True, file=sys.stderr)
         pyautogui.hotkey(*keys)
+
+
+    def right_click(self, x, y):
+        print(f"[DEBUG] 🖱️ right_click({x}, {y})", flush=True, file=sys.stderr)
+        self._move_and_wait(x, y)
+        pyautogui.rightClick()
