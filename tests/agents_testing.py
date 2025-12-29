@@ -27,8 +27,10 @@ def main():
         # "take a screenshot of current screen and save it as imageTest.png on Documents folder",
         # "Open Documents/Vedanshi folder in the file explorer",
         # "Open system Calculator and do sum of 10 and 500",
-        # "open Youtube in browser and play random music",
-        "Go to file explorer and Open Vedanshi folder inside Documents folder",
+        # "open Youtube in browser and play random music",10
+        "Go to file explorer and Open DeepSeek folder placed inside Documents folder",
+        # "Go to file explorer, Open Documents\DeepSeek folder ",
+
 
         
         # "Go to file explorer and Open Documents folder",
