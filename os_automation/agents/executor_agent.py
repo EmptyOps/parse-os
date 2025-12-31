@@ -1590,6 +1590,15 @@ class ExecutorAgent:
 
         if "wait" in low or "pause" in low or low in ("noop", "no-op"):
             return {"event": "noop"}
+        
+        if "press super key" in low:
+            return {"event": "hotkey", "keys": ["win"]}
+
+        if "press windows key" in low:
+            return {"event": "hotkey", "keys": ["win"]}
+
+        if "press command+space" in low:
+            return {"event": "hotkey", "keys": ["command", "space"]}
 
         # Fallback: treat as typing (e.g., ambiguous "Type something...")
         return {"event": "type", "text": desc}
@@ -1916,6 +1925,55 @@ class ExecutorAgent:
         is_gui_enter = low == "press enter" or low == "enter"
         
         # ============================================================
+        # OS LAUNCHER HOTKEY SHORT-CIRCUIT
+        # ============================================================
+        if "press super key" in low or "press windows key" in low:
+            before = _screenshot(self.output_dir, "before_launcher")
+            pyautogui.press("win")
+            time.sleep(0.6)
+            after = _screenshot(self.output_dir, "after_launcher")
+
+            return yaml.safe_dump(
+                {
+                    "execution": {
+                        "attempts": 1,
+                        "last": {
+                            "status": "success",
+                            "before": before,
+                            "after": after,
+                            "event": "os_launcher",
+                        },
+                    },
+                    "validation": {"validation_status": "pass"},
+                    "escalate": False,
+                },
+                sort_keys=False,
+            )
+
+        if "press command+space" in low:
+            before = _screenshot(self.output_dir, "before_launcher")
+            pyautogui.hotkey("command", "space")
+            time.sleep(0.6)
+            after = _screenshot(self.output_dir, "after_launcher")
+
+            return yaml.safe_dump(
+                {
+                    "execution": {
+                        "attempts": 1,
+                        "last": {
+                            "status": "success",
+                            "before": before,
+                            "after": after,
+                            "event": "spotlight",
+                        },
+                    },
+                    "validation": {"validation_status": "pass"},
+                    "escalate": False,
+                },
+                sort_keys=False,
+            )
+        
+        # ============================================================
         # GUI TYPE / ENTER SHORT-CIRCUIT (NO BBOX, NO RETRY)
         # ============================================================
         if is_gui_type:
@@ -1975,6 +2033,49 @@ class ExecutorAgent:
                 "validation": {"validation_status": "pass"},
                 "escalate": False
             }, sort_keys=False)
+            
+            
+        # ============================================================
+        # WAIT / PAUSE SHORT-CIRCUIT (NO BBOX, NO RETRY)
+        # ============================================================
+        if "wait" in low or "pause" in low:
+            logger.info("Wait step detected → sleeping")
+
+            before = _screenshot(self.output_dir, "before_wait")
+
+            # Default wait duration
+            duration = 1.5
+
+            # Optional: parse "wait 3 seconds"
+            m = re.search(r"wait\s+(\d+(?:\.\d+)?)", low)
+            if m:
+                duration = float(m.group(1))
+
+            time.sleep(duration)
+
+            after = _screenshot(self.output_dir, "after_wait")
+
+            return yaml.safe_dump(
+                {
+                    "execution": {
+                        "attempts": 1,
+                        "last": {
+                            "status": "success",
+                            "before": before,
+                            "after": after,
+                            "event": "wait",
+                            "duration": duration,
+                        },
+                    },
+                    "validation": {"validation_status": "pass"},
+                    "escalate": False,
+                },
+                sort_keys=False,
+            )
+            
+            
+        
+
 
         
         # ============================================================
@@ -2063,27 +2164,51 @@ class ExecutorAgent:
             bbox = self._detect_bbox(description, image_path=shot)
 
             # No bbox found: mark attempt failed (strict)
+            
+            # if bbox is None:
+            #     logger.warning("[STRICT] No bbox found → marking attempt as failed without event.")
+
+            #     exec_result = {
+            #         "status": "failed",
+            #         "before": _screenshot(self.output_dir, "before_no_bbox"),
+            #         "after": _screenshot(self.output_dir, "after_no_bbox"),
+            #         "error": "no_bbox_detected"
+            #     }
+
+            #     last_execution = exec_result
+            #     exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
+            #     validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+            #     validation = yaml.safe_load(validation_yaml)
+            #     last_validation = validation
+
+            #     logger.debug("→ Validation (no bbox): %s", validation)
+            #     time.sleep(0.8)
+            #     continue
+            
+            
             if bbox is None:
-                logger.warning("[STRICT] No bbox found → marking attempt as failed without event.")
+                logger.warning("No bbox found → waiting and retrying detection")
 
-                exec_result = {
-                    "status": "failed",
-                    "before": _screenshot(self.output_dir, "before_no_bbox"),
-                    "after": _screenshot(self.output_dir, "after_no_bbox"),
-                    "error": "no_bbox_detected"
-                }
+                time.sleep(0.7)
 
-                last_execution = exec_result
-                exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
-                validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-                validation = yaml.safe_load(validation_yaml)
-                last_validation = validation
+                shot_retry = _screenshot(self.output_dir, "shot_retry")
+                bbox = self._detect_bbox(description, image_path=shot_retry)
 
-                logger.debug("→ Validation (no bbox): %s", validation)
-                time.sleep(0.8)
-                continue
-            
-            
+                if bbox is None:
+                    exec_result = {
+                        "status": "failed",
+                        "before": _screenshot(self.output_dir, "before_no_bbox"),
+                        "after": _screenshot(self.output_dir, "after_no_bbox"),
+                        "error": "no_bbox_detected"
+                    }
+
+                    last_execution = exec_result
+                    exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
+                    validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
+                    last_validation = yaml.safe_load(validation_yaml)
+
+                    time.sleep(0.8)
+                    continue 
             
             event_spec = self._map_description_to_event(description)
 

@@ -98,6 +98,38 @@ NAVIGATION RULE (MANDATORY)
 - If a location exists in a sidebar or tree, ALWAYS click it.
 - NEVER type navigation text unless explicitly stated.
 
+APPLICATION LAUNCH RULE (CRITICAL)
+---------------------------------
+If the task involves opening ANY OS application (Calculator, Text Editor, Notepad, VS Code, Browser, etc.):
+
+You MUST:
+1) Open the OS application launcher
+2) Type the application name
+3) Press Enter
+4) Wait for the application window
+
+NEVER attempt to click application icons directly on the desktop or taskbar.
+This rule applies to ALL applications.
+
+OS LAUNCHER ACTIONS (MANDATORY)
+------------------------------
+When opening any OS application, use these exact steps:
+
+Windows:
+- "Press Windows key"
+
+macOS:
+- "Press Command+Space"
+
+Linux:
+- "Press Super key"
+
+WAIT RULE (CRITICAL)
+-------------------
+After opening any application or launcher, you MUST include:
+- "Wait for application to open"
+
+This step is NOT optional.
 
 CORE BEHAVIOR
 -------------
@@ -166,6 +198,20 @@ RULES
 - Always wrap typed text in single quotes: Type 'hello.py'
 - Be specific: "Click New File button" instead of "Click button".
 - Do NOT invent irrelevant apps (no random browser open if user asked for terminal).
+
+FORBIDDEN DESCRIPTIONS
+---------------------
+Do NOT use vague actions such as:
+- wait for
+- ensure
+- focus
+- verify
+
+Use only explicit actions:
+- Press
+- Click
+- Type
+- Wait
 
 OUTPUT FORMAT (VERY IMPORTANT)
 ------------------------------
@@ -249,6 +295,10 @@ steps:
         """
 
         system_prompt = """
+SYSTEM CONTEXT
+--------------
+- Current operating system: {system_os}        
+
 You are an OS automation planner performing a REPLAN.
 
 Context:
@@ -306,6 +356,10 @@ RULES
 - Be explicit and clear about targets (e.g., "Click New File button", not "Click button").
 - Wrap typed text in single quotes.
 - Do NOT invent irrelevant steps or applications.
+
+If a step failed, you may assume the application is NOT open,
+unless explicitly proven otherwise.
+
 
 OUTPUT FORMAT
 -------------
