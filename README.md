@@ -93,7 +93,7 @@ This command automatically opens your browser and searches for Python tutorials 
 
 
 
-#### 🪄 Step-by-Step (for Beginners)
+### 🪄 Step-by-Step (for Beginners)
 
 1. Clone this repository to your system using:
    ```
