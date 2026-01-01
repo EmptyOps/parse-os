@@ -71,7 +71,7 @@ python -m os_automation.cli.cli run "open browser and search for python tutorial
 This command automatically opens your browser and searches for Python tutorials — helping you start learning Python right away!
 
 
-## ⚠️ Known Limitations & Setup Challenges
+### ⚠️ Known Limitations & Setup Challenges
 
 - Automation may **not work out of the box** on new systems due to missing OS-level permissions, display access, or required dependencies.
 
@@ -93,7 +93,7 @@ This command automatically opens your browser and searches for Python tutorials 
 
 
 
-# 🪄 Step-by-Step (for Beginners)
+#### 🪄 Step-by-Step (for Beginners)
 
 1. Clone this repository to your system using:
    ```
