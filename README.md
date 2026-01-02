@@ -84,7 +84,7 @@ This command automatically opens your browser and searches for Python tutorials 
 - **Cross-OS and UI variability** can impact automation due to differences in filesystem paths, shortcuts, window focus, load timing, screen scaling, themes, or unexpected system dialogs across Windows, Linux, and macOS.
 
 
-### 🪄 Step-by-Step (for Beginners)
+ Step-by-Step (for Beginners)
 
 1. Clone this repository to your system using:
    ```
