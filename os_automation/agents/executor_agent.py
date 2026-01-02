@@ -1559,6 +1559,10 @@ class ExecutorAgent:
 
         if "delete" in low and "backspace" not in low:
             return {"event": "keypress", "key": "delete"}
+        
+        # Ctrl+S (Save)
+        if "press ctrl+s" in low or "ctrl+s" in low:
+            return {"event": "hotkey", "keys": ["ctrl", "s"]}
 
         if "select all" in low or "ctrl+a" in low:
             return {"event": "hotkey", "keys": ["ctrl", "a"]}
@@ -1584,6 +1588,13 @@ class ExecutorAgent:
             return {"event": "double_click"}
         if "right click" in low or "context menu" in low:
             return {"event": "right_click"}
+        
+        # Calculator / operator buttons
+        m = re.search(r"press\s+'([^']+)'", low)
+        if m:
+            symbol = m.group(1)
+            return {"event": "keypress", "key": symbol}
+
 
         if "click" in low or "open " in low or "select " in low:
             return {"event": "click"}
@@ -1601,7 +1612,11 @@ class ExecutorAgent:
             return {"event": "hotkey", "keys": ["command", "space"]}
 
         # Fallback: treat as typing (e.g., ambiguous "Type something...")
-        return {"event": "type", "text": desc}
+        return {
+            "event": "unknown",
+            "error": "ambiguous_step_no_action"
+        }
+
 
     # ====================================================================
     # PERFORM VIA EXECUTOR ADAPTER (PyAutoGUI)
@@ -2072,10 +2087,6 @@ class ExecutorAgent:
                 },
                 sort_keys=False,
             )
-            
-            
-        
-
 
         
         # ============================================================

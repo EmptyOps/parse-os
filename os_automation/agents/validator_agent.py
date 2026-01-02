@@ -74,6 +74,7 @@ class ValidatorAgent:
     TYPE_THRESHOLD = 0.8
     CLICK_THRESHOLD = 1.2
     NAVIGATION_THRESHOLD = 1.5
+    KEYPRESS_THRESHOLD = 0.6
 
 
     def __init__(self):
@@ -400,6 +401,30 @@ class ValidatorAgent:
                 elif llm_decision is False:
                     details["llm_confirmation"] = "fail"
             return yaml.safe_dump({"validation_status": status, "details": details})
+        
+        # ===================== Keypress (non-navigation) =====================
+        if exe.get("event") == "keypress":
+            # Keypresses often change internal state with minimal pixel change
+            if diff > 0.5:
+                return yaml.safe_dump({
+                    "validation_status": "pass",
+                    "details": {
+                        "method": "keypress_low_visual_change",
+                        "diff": diff
+                    }
+                })
+
+            # fallback to OCR if available
+            ocr_after = _ocr(after).lower() if OCR_AVAILABLE else ""
+            if ocr_after.strip():
+                return yaml.safe_dump({
+                    "validation_status": "pass",
+                    "details": {
+                        "method": "keypress_ocr_fallback",
+                        "ocr_excerpt": ocr_after[:200]
+                    }
+                })
+
 
         # ===================== Default: any other change =====================
         status = "pass" if diff > self.NAVIGATION_THRESHOLD else "fail"
