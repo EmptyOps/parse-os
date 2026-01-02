@@ -78,19 +78,10 @@ This command automatically opens your browser and searches for Python tutorials 
 - Some automation flows rely on **resource-heavy local models or system components**. Performance may degrade on lower-end systems or machines without CUDA support.  
   _Tested on RTX 5090 · 64GB System RAM · 32GB VRAM · CUDA 12.8_
 
-- Setting up **OS-Atlas, vision libraries, and system-level dependencies** can be challenging on fresh machines, for example:
-  - CUDA / driver mismatches  
-  - PyTorch version conflicts  
-  - Missing OpenCV system libraries  
-  - Java / Sikuli bridge not available
+- Setting up **OS-Atlas**, **vision libraries**, and **system-level dependencies** can be challenging on fresh machines  
+  (e.g., CUDA/driver mismatches, PyTorch version conflicts, missing OpenCV system libs, Java/Sikuli bridge not available)
 
-- **Cross-OS and UI differences** can affect automation reliability due to variations in:
-  - Filesystem paths and shortcuts  
-  - Window focus and load timing  
-  - Screen scaling and themes  
-  - Unexpected system dialogs  
-  across Windows, Linux, and macOS.
-
+- **Cross-OS and UI variability** can impact automation due to differences in filesystem paths, shortcuts, window focus, load timing, screen scaling, themes, or unexpected system dialogs across Windows, Linux, and macOS.
 
 
 ### 🪄 Step-by-Step (for Beginners)
