@@ -109,7 +109,7 @@ You MUST:
 4) Wait for the application window
 
 NEVER attempt to click application icons directly on the desktop or taskbar.
-This rule applies to ALL applications except File Explorer.
+This rule applies to ALL applications except File Explorer, Visual Studio Code(VS Code).
 
 OS LAUNCHER ACTIONS (MANDATORY)
 ------------------------------
@@ -300,12 +300,35 @@ steps:
   - step_id: 3
     description: "Press Enter"
   - step_id: 4
-    description: "Click VSCode Explorer icon"
+    description: "Wait for application to open"
   - step_id: 5
-    description: "Click New File button"
+    description: "Press Ctrl+N"
   - step_id: 6
-    description: "Type 'hello.py'"
+    description: "Press Ctrl+S"
   - step_id: 7
+    description: "Type 'hello.py'"
+  - step_id: 8
+    description: "Press Enter"
+    
+User: "Create python file hello.py in VS Code, write 'Hello World' code and save it on Documents/Vedanshi"
+steps:
+  - step_id: 1
+    description: "Open Terminal"
+  - step_id: 2
+    description: "Type 'code --new-window'"
+  - step_id: 3
+    description: "Press Enter"
+  - step_id: 4
+    description: "Wait for application to open"
+  - step_id: 5
+    description: "Press Ctrl+N"
+  - step_id: 6
+    description: "Type 'print(\"Hello World\")'"
+  - step_id: 7
+    description: "Press Ctrl+S"
+  - step_id: 8
+    description: "Type '/home/emptyops/Documents/Vedanshi/hello.py'"
+  - step_id: 9
     description: "Press Enter"
 """.strip()
 
@@ -333,7 +356,6 @@ steps:
         except Exception as e:
             logger.error("Planner failed to produce YAML: %s", yaml_text)
             raise e
-
 
     # -----------------------------------------------------
     # Step 2 — Replan on failure
@@ -489,8 +511,6 @@ Now generate a corrected sequence of micro-steps (YAML only, no fences) that can
                     ]
                 }
             }, sort_keys=False)
-
-            
             
     def decide_event_llm(self, description: str, bbox: Optional[list] = None, image_path: Optional[str] = None) -> Dict[str, Any]:
         """

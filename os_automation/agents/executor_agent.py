@@ -1560,9 +1560,10 @@ class ExecutorAgent:
         if "delete" in low and "backspace" not in low:
             return {"event": "keypress", "key": "delete"}
         
-        # Ctrl+S (Save)
-        if "press ctrl+s" in low or "ctrl+s" in low:
-            return {"event": "hotkey", "keys": ["ctrl", "s"]}
+        # Generic Ctrl+<Key> hotkeys
+        m = re.search(r"press\s+ctrl\+([a-z])", low)
+        if m:
+            return {"event": "hotkey", "keys": ["ctrl", m.group(1)]}
 
         if "select all" in low or "ctrl+a" in low:
             return {"event": "hotkey", "keys": ["ctrl", "a"]}

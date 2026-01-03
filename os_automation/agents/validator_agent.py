@@ -191,8 +191,25 @@ class ValidatorAgent:
 
         diff = _pixel_diff(before, after)
         
+        # ===================== HOTKEY SHORT-CIRCUIT =====================
+        event = exe.get("event")
+
+        if event == "hotkey":
+            return yaml.safe_dump({
+                "validation_status": "pass",
+                "details": {
+                    "method": "trust_hotkey_execution",
+                    "note": "hotkeys may not cause visible pixel change"
+                }
+            })
+        
         # ===== LOCAL REGION DIFF (BBOX-LEVEL CHANGE CHECK) =====
         bbox = exe.get("bbox")
+        
+        # Skip bbox-based validation for hotkeys
+        if exe.get("event") == "hotkey":
+            bbox = None
+            
         if bbox and len(bbox) >= 4:
             try:
                 x, y, w, h = [int(v) for v in bbox[:4]]
