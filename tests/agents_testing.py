@@ -20,7 +20,7 @@ def main():
         # "Search youtube in browser and click on Youtube icone",
         # "Open file explorer and go to Documents Folder",
         # "Open new visual studio code window", 
-        "Open new visual studio code window and create python script name hello.py",
+        # "Open new visual studio code window and create python script name hello.py",
         # "Click on 'file' menu in VS code",
         # "Click on 'Edit' menu in VS code",
         # "Create python.py script on Documents folder",
@@ -41,7 +41,7 @@ def main():
         # "Open text editor in system and types 'Meeting at 5' and save it using CTRL+S on Documents/Vedanshi folder as TestingNote.txt",
         # "Search Python tutorial in Browser and click first link",
         # "Open setting of the system and Turn on the Wi-FI by click on toggle button of Wi-FI",
-        # "Open Calculator and do sum of 10 and 500",
+        "Open Calculator and do sum of 10 and 500",
         # "open gmail in browser, Click on compose to write new mail, write 'your-mail-address' in to TO field, 'Test Automation' on subject field and 'This is a test' on body part of mail then sent the mail",
 
         image_path=screenshot_path
