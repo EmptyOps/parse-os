@@ -1997,7 +1997,13 @@ class ExecutorAgent:
             try:
                 m = re.search(r"['\"]([^'\"]+)['\"]", description)
                 if m:
-                    pyautogui.write(m.group(1), interval=0.03)
+                    # pyautogui.write(m.group(1), interval=0.03)
+                    text = m.group(1)
+                    pyautogui.write(text, interval=0.03)
+
+                    # ⏳ HARD SAFETY DELAY (length-aware)
+                    time.sleep(max(0.3, len(text) * 0.02))
+                    
                 after = _screenshot(self.output_dir, "after_gui_type")
 
                 return yaml.safe_dump({
@@ -2068,6 +2074,10 @@ class ExecutorAgent:
                 duration = float(m.group(1))
 
             time.sleep(duration)
+            
+            # # 🔑 CONTEXT SWITCH: after app launch waits, assume GUI focus
+            # if "wait for application to open" in low:
+            #     self.execution_mode = "gui"
 
             after = _screenshot(self.output_dir, "after_wait")
 
@@ -2114,7 +2124,13 @@ class ExecutorAgent:
                 if is_terminal_type:
                     m = re.search(r"['\"]([^'\"]+)['\"]", description)
                     if m:
-                        pyautogui.write(m.group(1), interval=0.03)
+                        # pyautogui.write(m.group(1), interval=0.03)
+                        text = m.group(1)
+                        pyautogui.write(text, interval=0.03)
+
+                        # ⏳ terminal buffers need a bit more time
+                        time.sleep(max(0.4, len(text) * 0.025))
+
 
                 if is_terminal_enter:
                     pyautogui.press("enter")
@@ -2175,29 +2191,7 @@ class ExecutorAgent:
             shot = _screenshot(self.output_dir, "shot")
             bbox = self._detect_bbox(description, image_path=shot)
 
-            # No bbox found: mark attempt failed (strict)
-            
-            # if bbox is None:
-            #     logger.warning("[STRICT] No bbox found → marking attempt as failed without event.")
-
-            #     exec_result = {
-            #         "status": "failed",
-            #         "before": _screenshot(self.output_dir, "before_no_bbox"),
-            #         "after": _screenshot(self.output_dir, "after_no_bbox"),
-            #         "error": "no_bbox_detected"
-            #     }
-
-            #     last_execution = exec_result
-            #     exec_yaml = yaml.safe_dump({"step": step, "execution": exec_result}, sort_keys=False)
-            #     validation_yaml = validator_agent.validate_step_yaml(exec_yaml)
-            #     validation = yaml.safe_load(validation_yaml)
-            #     last_validation = validation
-
-            #     logger.debug("→ Validation (no bbox): %s", validation)
-            #     time.sleep(0.8)
-            #     continue
-            
-            
+            # No bbox found
             if bbox is None:
                 logger.warning("No bbox found → waiting and retrying detection")
 

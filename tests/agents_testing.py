@@ -41,8 +41,17 @@ def main():
         # "Open text editor in system and types 'Meeting at 5' and save it using CTRL+S on Documents/Vedanshi folder as TestingNote.txt",
         # "Search Python tutorial in Browser and click first link",
         # "Open setting of the system and Turn on the Wi-FI by click on toggle button of Wi-FI",
-        "Open Calculator and do sum of 10 and 500",
+        # "Open Calculator and do sum of 10 and 500",
         # "open gmail in browser, Click on compose to write new mail, write 'your-mail-address' in to TO field, 'Test Automation' on subject field and 'This is a test' on body part of mail then sent the mail",
+
+
+        # "Open new Visual studio code window",
+        # "Open new visual studio code window, create a new file using CTRL+N, type the code 'print('Hello Automation')' and save it as test.py on Documents folder",
+        # "Open Documents/test.py file and replace the 'Hello Automation' from print statement by 'Hello OS Automation' and save it using CTRL+S",
+        # "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
+        # "Open vs code extension panel using CTRL+SHIFT+X, search for python extension and install it by clicking on install button",
+
+        "Open new visual studio code window, create a new file using CTRL+N, type the print statement with Hello Automation inside that and save it as test.py on Documents folder",
 
         image_path=screenshot_path
     )

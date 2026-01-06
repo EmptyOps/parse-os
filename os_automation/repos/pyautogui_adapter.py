@@ -124,7 +124,6 @@ class PyAutoGUIAdapter(BaseAdapter):
             elif event == "type":
                 pyautogui.write(text or "", interval=0.03)
 
-
             elif event == "keypress":
                 # key could be: enter, backspace, delete, left, right, up, down...
                 self.tool.keypress(key)

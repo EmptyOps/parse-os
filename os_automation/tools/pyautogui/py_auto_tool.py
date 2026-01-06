@@ -106,7 +106,6 @@ class PyAutoTool:
         print(f"[DEBUG] ⌨️ hotkey({keys})", flush=True, file=sys.stderr)
         pyautogui.hotkey(*keys)
 
-
     def right_click(self, x, y):
         print(f"[DEBUG] 🖱️ right_click({x}, {y})", flush=True, file=sys.stderr)
         self._move_and_wait(x, y)
