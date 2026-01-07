@@ -299,7 +299,6 @@ class Orchestrator:
         self.executor_contract = registry.get_contract(self.executor_choice)
         self.detection_contract = registry.get_contract(self.detection_choice)
 
-
     def run(self, user_prompt: str, image_path: str = None):
         """
         Adaptive run:
@@ -366,86 +365,6 @@ class Orchestrator:
                 }
 
             final_step_reports = []
-            
-            # for step in planned_steps:
-            #     print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
-
-            #     step_result = self.executor_agent.run_step(
-            #         step_id=step.step_id,
-            #         step_description=step.description,
-            #         validator_agent=self.validator_agent,
-            #         max_attempts=3,
-            #         original_prompt=user_prompt,
-            #     )
-
-            #     step_report = {
-            #         "step": step.dict(),
-            #         "execution": step_result.get("execution"),
-            #         "validation": step_result.get("validation"),
-            #     }
-            #     final_step_reports.append(step_report)
-
-                # # ===================== 🔴 CRITICAL ESCALATION GATE =====================
-                # if step_result.get("escalate") is True:
-                #     print("⚠️ Step failed after retries → invoking replan")
-
-                #     failed_step_yaml = yaml.safe_dump(step.dict())
-                #     failure_details_yaml = yaml.safe_dump(step_result)
-
-                #     replan_yaml = self.main_agent.replan_on_failure(
-                #         user_prompt=user_prompt,
-                #         failed_step_yaml=failed_step_yaml,
-                #         failure_details_yaml=failure_details_yaml,
-                #     )
-
-                #     replan = yaml.safe_load(replan_yaml)
-
-                #     # If planner itself escalated → STOP
-                #     if "escalation" in replan:
-                #         print("❌ Replan failed → stopping execution")
-                #         return {
-                #             "user_prompt": user_prompt,
-                #             "overall_status": "failed",
-                #             "reason": "step_failed_after_replan",
-                #             "details": replan,
-                #         }
-
-                #     # Run replanned steps ONCE
-                #     for ns in replan.get("steps", []):
-                #         print(f"🔁 REPLAN STEP: {ns['description']}")
-
-                #         retry_result = self.executor_agent.run_step(
-                #             step_id=ns.get("step_id", 9999),
-                #             step_description=ns["description"],
-                #             validator_agent=self.validator_agent,
-                #             max_attempts=1,
-                #             original_prompt=user_prompt,
-                #         )
-
-                #         final_step_reports.append({
-                #             "step": ns,
-                #             "execution": retry_result.get("execution"),
-                #             "validation": retry_result.get("validation"),
-                #         })
-
-                #         # ❌ If replan also fails → STOP HARD
-                #         if retry_result.get("escalate") is True:
-                #             print("❌ Replanned step also failed → aborting task")
-                #             return {
-                #                 "user_prompt": user_prompt,
-                #                 "overall_status": "failed",
-                #                 "reason": "replanned_step_failed",
-                #             }
-
-                #     # After replan success → continue to next original step
-                #     continue
-
-                # # ===================== NORMAL FLOW =====================
-                # self.main_agent.receive_observation(
-                #     step.step_id,
-                #     step.description,
-                #     step_result.get("validation", {}).get("details"),
-                # )
 
 
             for step in planned_steps:

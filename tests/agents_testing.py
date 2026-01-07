@@ -48,10 +48,10 @@ def main():
         # "Open new Visual studio code window",
         # "Open new visual studio code window, create a new file using CTRL+N, type the code 'print('Hello Automation')' and save it as test.py on Documents folder",
         # "Open Documents/test.py file and replace the 'Hello Automation' from print statement by 'Hello OS Automation' and save it using CTRL+S",
-        # "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
+        "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
         # "Open vs code extension panel using CTRL+SHIFT+X, search for python extension and install it by clicking on install button",
 
-        "Open new visual studio code window, create a new file using CTRL+N, type the print statement with Hello Automation inside that and save it as test.py on Documents folder",
+        # "Open new visual studio code window, create a new file using CTRL+N, type the print statement with Hello Automation inside that and save it as test.py on Documents folder",
 
         image_path=screenshot_path
     )
