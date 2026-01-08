@@ -1199,6 +1199,22 @@ pyautogui.FAILSAFE = True
 # Default attempts: retry 3 times; after that, escalate to planner
 DEFAULT_MAX_ATTEMPTS = 3
 
+# ---------- OUTPUT PATH (GLOBAL, IMPORT-SAFE) ----------
+_THIS_FILE = os.path.abspath(__file__)
+
+# os_automation/agents → os_automation → parse-os
+_REPO_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(_THIS_FILE), "..", "..")
+)
+
+# parse-os → parse_os (parent of repo)
+PROJECT_PARENT = os.path.dirname(_REPO_ROOT)
+
+DEFAULT_OUTPUT_DIR = os.path.join(
+    PROJECT_PARENT, "os_automation_output"
+)
+# ------------------------------------------------------
+
 
 # -------------------------------------------------------
 # Screenshot helper
@@ -1250,9 +1266,8 @@ class ExecutorAgent:
 
         self.max_attempts = int(max_attempts)
 
-        self.output_dir = output_dir or os.path.join(
-            os.getcwd(), "os_automation_output"
-        )
+        self.output_dir = output_dir or DEFAULT_OUTPUT_DIR
+
         os.makedirs(self.output_dir, exist_ok=True)
 
         try:

@@ -336,6 +336,7 @@ class Orchestrator:
 
         # PARTIAL mode: your original pipeline (planner -> executor_agent -> validator)
         elif mode == IntegrationMode.PARTIAL:
+            
             print(f"[IntegrationMode: PARTIAL] Running enhanced 3-agent flow...")
 
             # ---------------------------
@@ -345,7 +346,9 @@ class Orchestrator:
 
             # Convert YAML → PlannedStep list
             try:
+                
                 parsed = yaml.safe_load(yaml_text)
+                
                 if not isinstance(parsed, dict) or "steps" not in parsed:
                     raise ValueError(f"Planner returned invalid YAML: {yaml_text}")
 
@@ -356,6 +359,7 @@ class Orchestrator:
                 ]
 
             except Exception as e:
+                
                 return {
                     "user_prompt": user_prompt,
                     "overall_status": "failed",

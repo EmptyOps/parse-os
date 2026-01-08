@@ -44,6 +44,21 @@ from os_automation.core.adapters import BaseAdapter
 
 logger = logging.getLogger(__name__)
 
+# ---------- OUTPUT PATH (DUPLICATED ON PURPOSE) ----------
+_THIS_FILE = os.path.abspath(__file__)
+
+# os_automation/repos → os_automation → parse-os
+_REPO_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(_THIS_FILE), "..", "..")
+)
+
+PROJECT_PARENT = os.path.dirname(_REPO_ROOT)
+
+DEFAULT_OUTPUT_DIR = os.path.join(
+    PROJECT_PARENT, "os_automation_output"
+)
+# ------------------------------------------------------
+
 
 class PyAutoGUIAdapter(BaseAdapter):
     """
@@ -64,9 +79,10 @@ class PyAutoGUIAdapter(BaseAdapter):
 
     def __init__(self):
         self.tool = PyAutoTool()
-        self.output_dir = os.path.join(os.getcwd(), "os_automation_output")
-        os.makedirs(self.output_dir, exist_ok=True)
+        self.output_dir = DEFAULT_OUTPUT_DIR
 
+        os.makedirs(self.output_dir, exist_ok=True)
+        
     # ---------------------------------------------------------
     # DETECT — not used for PyAutoGUI
     # ---------------------------------------------------------
