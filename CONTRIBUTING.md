@@ -8,7 +8,7 @@
 - Architecture refinement
 - Execution flow improvements
 
-### **ParseOS MCP Server – Kilo Code**
+### **ParseOS MCP – Kilo Code**
 - Test automation within browser
 - Test automation beyond browser
 - Current focus: Web development
