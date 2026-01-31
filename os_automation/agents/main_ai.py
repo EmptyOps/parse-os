@@ -47,7 +47,42 @@ class MainAIAgent:
         # ==== NEW FIELDS FOR OPENCOMPUTERUSE STYLE FEEDBACK LOOPS ====
         self.history: List[Dict[str, Any]] = []
         self.original_prompt: Optional[str] = None
+        
+        
+    def can_use_mcp(self, user_prompt: str) -> Optional[str]:
+        """
+        Decide whether this task should be routed to an MCP server.
+        Returns adapter name if yes, otherwise None.
+        """
 
+        text = user_prompt.lower()
+
+        # Browser / web / devtools signals
+        chrome_keywords = [
+            "browser",
+            "website",
+            "web page",
+            "open url",
+            "inspect",
+            "devtools",
+            "dom",
+            "css",
+            "html",
+            "console",
+            "network tab",
+            "elements tab",
+            "run javascript",
+            "click button",
+            "fill form",
+            "web automation",
+            "browser automation",
+            "test website"
+        ]
+
+        if any(k in text for k in chrome_keywords):
+            return "mcp_chrome_devtools"
+
+        return None
 
     # -----------------------------------------------------
     # Step 1 — High-level → micro-plan
@@ -59,6 +94,20 @@ class MainAIAgent:
         """
         system_os = platform.system()  # Linux / Darwin / Windows
         
+        # 🔥 MCP ROUTING DECISION (NEW)
+        mcp_adapter = self.can_use_mcp(user_prompt)
+        if mcp_adapter:
+            return yaml.safe_dump(
+                {
+                    "mcp": {
+                        "adapter": mcp_adapter,
+                        "task": user_prompt
+                    }
+                },
+                sort_keys=False
+            )
+
+        # existing logic continues unchanged
         # 🔥 REQUIRED FOR OBSERVATION-DRIVEN PLANNING
         self.original_prompt = user_prompt
         self.history = []

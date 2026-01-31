@@ -29,7 +29,7 @@
 #   detection: open_computer_use       # 🔹 if set to open_computer_use, will fire that adapter
 #   executor: open_computer_use        # 🔹 can still fallback to visual if MCP not used
 
-
+# # configs/repos.yaml
 detection_adapters:
   omniparser:
     type: class
@@ -54,6 +54,15 @@ executor_adapters:
   open_computer_use:
     type: class
     path: os_automation.repos.open_computer_use_adapter.OpenComputerUseAdapter
+  mcp_chrome_devtools:
+    type: class
+    path: os_automation.repos.chrome_devtools_mcp_adapter.ChromeDevToolsMCPAdapter
+    external: true
+    protocol: websocket
+    endpoint: ws://127.0.0.1:9222
+  gemini_mcp_chrome_devtools:
+    type: class
+    path : os_automation.repos.chrome_devtools_mcp_adapter.gemini_mcp_chrome_devtools
 
 default_tools:
   detection: osatlas        # ✅ switch from open_computer_use
