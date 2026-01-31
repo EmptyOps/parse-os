@@ -1,4 +1,4 @@
-# Contribution Guidelines
+# Contribution Areas & Ongoing Work
 
 ---
 
