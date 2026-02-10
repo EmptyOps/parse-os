@@ -62,7 +62,7 @@ executor_adapters:
     endpoint: ws://127.0.0.1:9222
   gemini_mcp_chrome_devtools:
     type: class
-    path : os_automation.repos.chrome_devtools_mcp_adapter.gemini_mcp_chrome_devtools
+    path : os_automation.repos.gemini_chrome_devtools_mcp_adapter.GeminiChromeDevToolsMCPAdapter
 
 default_tools:
   detection: osatlas        # ✅ switch from open_computer_use

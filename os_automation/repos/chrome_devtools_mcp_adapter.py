@@ -115,7 +115,7 @@ import pychrome
 from os_automation.repos.mcp_base_adapter import MCPBaseAdapter
 
 
-class ChromeDevToolsAdapter(MCPBaseAdapter):
+class ChromeDevToolsMCPAdapter(MCPBaseAdapter):
     """
     FULL adapter.
     Owns browser automation end-to-end using chrome-devtools-mcp.
@@ -178,83 +178,39 @@ class ChromeDevToolsAdapter(MCPBaseAdapter):
         browser = pychrome.Browser(url="http://127.0.0.1:9222")
         tab = browser.new_tab()
         tab.start()
-        tab.Page.navigate(url="https://www.google.com")
+        tab.Page.navigate(url="https://sphereplugins.com/")
         tab.wait(2)
-        tab.Page.bringToFront()
 
-        tab.Runtime.evaluate(
-            expression="""
-            (async () => {
-                function sleep(ms) {
-                    return new Promise(r => setTimeout(r, ms));
-                }
-
-                // Ensure document is ready
-                if (document.readyState !== "complete") {
-                    await new Promise(r => window.addEventListener("load", r, { once: true }));
-                }
-
-                let box = null;
-
-                // Try multiple selectors (Google changes this often)
-                const selectors = [
-                    'textarea[name="q"]',
-                    'input[name="q"]',
-                    'textarea[aria-label="Search"]',
-                    'input[aria-label="Search"]'
-                ];
-
-                for (let i = 0; i < 30; i++) {
-                    for (const sel of selectors) {
-                        box = document.querySelector(sel);
-                        if (box) break;
-                    }
-                    if (box) break;
-                    await sleep(300);
-                }
-
-                if (!box) {
-                    console.error("❌ Google search box NOT found");
-                    alert("Search box not found by automation");
-                    return;
-                }
-
-                // Bring focus
-                box.focus();
-                await sleep(200);
-
-                // Clear any existing value
-                box.value = "";
-                box.dispatchEvent(new Event("input", { bubbles: true }));
-                await sleep(200);
-
-                // Human-like typing
-                const text = "Python Tutorial";
-                for (const ch of text) {
-                    box.value += ch;
-                    box.dispatchEvent(new Event("input", { bubbles: true }));
-                    await sleep(90);
-                }
-
-                // Press Enter
-                box.dispatchEvent(new KeyboardEvent("keydown", {
-                    bubbles: true,
-                    cancelable: true,
-                    key: "Enter",
-                    code: "Enter",
-                    keyCode: 13
-                }));
-            })();
-            """
-        )
-
+        # Find and click the "Blog" link.
+        root_node = tab.DOM.getDocument()
+        blog_link = tab.DOM.querySelector(nodeId=root_node['root']['nodeId'], selector='a[href="https://sphereplugins.com/blog/"]')
+        if blog_link:
+            box_model = tab.DOM.getBoxModel(nodeId=blog_link['nodeId'])
+            quad = box_model['model']['border']
+            x = (quad[0] + quad[2]) / 2
+            y = (quad[1] + quad[5]) / 2
+            tab.Input.dispatchMouseEvent(type='mousePressed', x=x, y=y, button='left', clickCount=1)
+            tab.Input.dispatchMouseEvent(type='mouseReleased', x=x, y=y, button='left', clickCount=1)
 
         tab.wait(5)
 
+        # Find and click the blog post
+        root_node = tab.DOM.getDocument()
+        post_link = tab.DOM.querySelector(nodeId=root_node['root']['nodeId'], selector='a[href="https://sphereplugins.com/from-website-to-leads-part-2/"]')
+        if post_link:
+            box_model = tab.DOM.getBoxModel(nodeId=post_link['nodeId'])
+            quad = box_model['model']['border']
+            x = (quad[0] + quad[2]) / 2
+            y = (quad[1] + quad[5]) / 2
+            tab.Input.dispatchMouseEvent(type='mousePressed', x=x, y=y, button='left', clickCount=1)
+            tab.Input.dispatchMouseEvent(type='mouseReleased', x=x, y=y, button='left', clickCount=1)
+
+        tab.wait(5)
+        
         # --------------------------------------------------
         # 4. Done
         # --------------------------------------------------
         return {
             "status": "success",
-            "message": "Browser opened and search executed using Chrome DevTools"
+            "message": f"Browser opened and searched for '{search_query}' using Chrome DevTools"
         }

@@ -1943,6 +1943,7 @@ class ExecutorAgent:
         max_attempts: Optional[int] = None,
         original_prompt: Optional[str] = None,
     ) -> str:
+            
         validator_agent = validator_agent or self.validator
         max_attempts = max_attempts or self.max_attempts
 
@@ -1950,6 +1951,18 @@ class ExecutorAgent:
         description = step.get("description") or ""
         step_id = step.get("step_id", 0)
         low = description.lower().strip()
+        
+        # 🚫 SAFETY NET: Browser tasks must not reach GUI executor when MCP is preferred
+        if self.chrome_preference and any(
+            k in low for k in (
+                "browser", "website", "click link", "fill form",
+                "submit", "login", "inspect", "devtools"
+            )
+        ):
+            raise RuntimeError(
+                "Browser automation detected in ExecutorAgent. "
+                "Task should have been routed to MCP."
+            )
         
         
         is_gui_type = low.startswith("type ")

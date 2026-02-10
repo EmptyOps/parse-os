@@ -12,7 +12,8 @@ from os_automation.agents.executor_agent import ExecutorAgent
 from os_automation.agents.validator_agent import ValidatorAgent
 from os_automation.repos.mcp_adapter import MCPFileSystemAdapter
 from os_automation.core.integration_contract import IntegrationMode
-from os_automation.repos.chrome_devtools_mcp_adapter import ChromeDevToolsAdapter
+from os_automation.repos.chrome_devtools_mcp_adapter import ChromeDevToolsMCPAdapter
+from os_automation.repos.gemini_chrome_devtools_mcp_adapter import GeminiChromeDevToolsMCPAdapter
 
 def _load_config():
     cfg_path = Path(__file__).resolve().parents[2] / "configs" / "repos.yaml"
@@ -20,10 +21,10 @@ def _load_config():
         return {}
     with open(cfg_path, "r") as f:
         return yaml.safe_load(f) or {}
-
+    
 class Orchestrator:
     def __init__(self, config_tool_override: str = None, config_detection_override: str = None,
-                 detection_name: str = None, executor_name: str = None):
+                 detection_name: str = None, executor_name: str = None, mcp_adapter: str = None):
         self.config = _load_config()
 
         # Register adapters (store classes or factory lambdas)
@@ -32,7 +33,8 @@ class Orchestrator:
         registry.register_adapter("pyautogui", PyAutoGUIAdapter)
         registry.register_adapter("sikuli", SikuliAdapter)
         registry.register_adapter("mcp_filesystem", MCPFileSystemAdapter)
-        registry.register_adapter("mcp_chrome_devtools", ChromeDevToolsAdapter)
+        registry.register_adapter("mcp_chrome_devtools", ChromeDevToolsMCPAdapter)
+        registry.register_adapter("gemini_mcp_chrome_devtools", GeminiChromeDevToolsMCPAdapter)
 
         # Dynamically register OpenComputerUse adapter if available
         try:
@@ -48,14 +50,15 @@ class Orchestrator:
         # except Exception:
         #     pass
 
-
         # Determine defaults from config.yaml
         default_detection = (self.config.get("default_tools", {}) or {}).get("detection", "omniparser")
         default_executor = (self.config.get("default_tools", {}) or {}).get("executor", "pyautogui")
+        default_mcp = (self.config.get("default_tools", {}) or {}).get("mcp", None)
 
         # Prioritize explicit parameters: detection_name / executor_name > overrides > config defaults
         self.detection_choice = detection_name or config_detection_override or default_detection
         self.executor_choice = executor_name or config_tool_override or default_executor
+        self.mcp_choice = mcp_adapter or default_mcp
 
         # Validate that registry contains the adapters
         for choice_name, adapter_type in [("detection", self.detection_choice), ("executor", self.executor_choice)]:
@@ -74,6 +77,32 @@ class Orchestrator:
         self.executor_contract = registry.get_contract(self.executor_choice)
         self.detection_contract = registry.get_contract(self.detection_choice)
 
+    def _dispatch_mcp(self, parsed_plan: dict):
+        mcp = parsed_plan.get("mcp")
+        if not mcp:
+            return None
+
+        adapter_name = mcp.get("adapter")
+        task = mcp.get("task")
+
+        adapter_factory = registry.get_adapter(adapter_name)
+        if adapter_factory is None:
+            raise RuntimeError(f"MCP adapter not found: {adapter_name}")
+
+        adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+
+        print(f"[MCP] Executing via adapter '{adapter_name}'")
+
+        result = adapter.execute({"task": task})
+
+        # 🔒 TERMINAL RESULT
+        return {
+            "mode": "mcp",
+            "adapter": adapter_name,
+            "result": result,
+        }
+
+
     def run(self, user_prompt: str, image_path: str = None):
         """
         Adaptive run:
@@ -83,24 +112,47 @@ class Orchestrator:
         """
         
         # =====================================================
+        # 🔥 MCP HARD ROUTING (NO PLANNING)
+        # =====================================================
+        mcp_adapter = self.main_agent.can_use_mcp(user_prompt)
+        if mcp_adapter:
+            adapter_factory = registry.get_adapter(mcp_adapter)
+            if adapter_factory is None:
+                raise RuntimeError(f"MCP adapter '{mcp_adapter}' not registered")
+
+            adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+
+            print(f"[MCP] Direct routing to '{mcp_adapter}' (planner skipped)")
+            return {
+                "mode": "mcp",
+                "adapter": mcp_adapter,
+                "result": adapter.execute({"task": user_prompt}),
+            }
+            
+        # =====================================================
         # 🔥 1️⃣ PLANNER FIRST (MCP-aware)
         # =====================================================
         yaml_text = self.main_agent.plan(user_prompt)
         parsed = yaml.safe_load(yaml_text)
+        
+        # # 🔥 MCP = TERMINAL EXECUTION MODE
+        # mcp_result = self._dispatch_mcp(parsed)
+        # if mcp_result is not None:
+        #     return mcp_result
 
-        # 🔥 MCP SHORT-CIRCUIT
-        if isinstance(parsed, dict) and "mcp" in parsed:
-            mcp_info = parsed["mcp"]
-            adapter_name = mcp_info.get("adapter")
+        # # 🔥 MCP SHORT-CIRCUIT
+        # if isinstance(parsed, dict) and "mcp" in parsed:
+        #     mcp_info = parsed["mcp"]
+        #     adapter_name = mcp_info.get("adapter")
 
-            adapter_factory = registry.get_adapter(adapter_name)
-            if adapter_factory is None:
-                raise ValueError(f"MCP adapter '{adapter_name}' not registered")
+        #     adapter_factory = registry.get_adapter(adapter_name)
+        #     if adapter_factory is None:
+        #         raise ValueError(f"MCP adapter '{adapter_name}' not registered")
 
-            adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+        #     adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
 
-            print(f"[MCP] Routing task to '{adapter_name}'")
-            return adapter.execute(mcp_info)
+        #     print(f"[MCP] Routing task to '{adapter_name}'")
+        #     return adapter.execute(mcp_info)
 
         # Resolve adapter factory/class
         exec_adapter_factory = registry.get_adapter(self.executor_choice)

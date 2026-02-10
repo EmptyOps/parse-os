@@ -6,10 +6,7 @@ from os_automation.core.orchestrator import Orchestrator
 def main():
     """Runs the OS automation orchestrator."""
     # The user query to run
-    if len(sys.argv) > 1:
-        user_query = " ".join(sys.argv[1:])
-    else:
-        user_query = "open browser and go to amazon.in and search for 'wireless keyboard'"
+    user_query = "Open browser and go to https://sphereplugins.com/ , go on Products and find Free Plugins and then return the first Plugins name"
 
     # The orchestrator to run the user query
     orchestrator = Orchestrator(mcp_adapter="mcp_chrome_devtools")

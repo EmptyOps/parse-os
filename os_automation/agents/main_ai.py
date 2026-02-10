@@ -80,7 +80,8 @@ class MainAIAgent:
         ]
 
         if any(k in text for k in chrome_keywords):
-            return "mcp_chrome_devtools"
+            # return "mcp_chrome_devtools"
+            return "gemini_mcp_chrome_devtools"
 
         return None
 
@@ -94,7 +95,24 @@ class MainAIAgent:
         """
         system_os = platform.system()  # Linux / Darwin / Windows
         
-        # 🔥 MCP ROUTING DECISION (NEW)
+        # # 🔥 MCP ROUTING DECISION (NEW)
+        # mcp_adapter = self.can_use_mcp(user_prompt)
+        # if mcp_adapter:
+        #     return yaml.safe_dump(
+        #         {
+        #             "mcp": {
+        #                 "adapter": mcp_adapter,
+        #                 "task": user_prompt
+        #             }
+        #         },
+        #         sort_keys=False
+        #     )
+
+        # # existing logic continues unchanged
+        # # 🔥 REQUIRED FOR OBSERVATION-DRIVEN PLANNING
+        # self.original_prompt = user_prompt
+        # self.history = []
+        
         mcp_adapter = self.can_use_mcp(user_prompt)
         if mcp_adapter:
             return yaml.safe_dump(
@@ -106,9 +124,8 @@ class MainAIAgent:
                 },
                 sort_keys=False
             )
-
-        # existing logic continues unchanged
-        # 🔥 REQUIRED FOR OBSERVATION-DRIVEN PLANNING
+        
+        # ⬇️ ONLY NON-MCP TASKS REACH HERE
         self.original_prompt = user_prompt
         self.history = []
 
