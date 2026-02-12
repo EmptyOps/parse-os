@@ -1,2 +1,0 @@
-Using chrome-devtools MCP.
-Open browser and go to https://sphereplugins.com/ , go on Quick Links, find BigCommerce and click on 'Ring Builder Plugin – BigCommerce'
