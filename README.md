@@ -105,7 +105,7 @@ Step-by-Step (for Beginners)
 
 ## 🏗️ Architecture – How It’s Built
 
-- Three AI Agents — (Main Planner, OmniParserEventExecutor, Validator)  
+- Three AI Agents — (Main Planner, Executor, Validator)  
 - Task Abstraction Layer (TAL) — the shared contract schema between all agents  
 - Adapters — thin wrappers that let you plug in any repo or model without rewriting the system  
 - Registry — keeps track of which adapters are available  
