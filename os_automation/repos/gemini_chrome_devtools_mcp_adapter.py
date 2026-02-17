@@ -204,6 +204,7 @@
 #             "output": output
 #         }
 
+# os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
 
 import subprocess
 from os_automation.repos.mcp_base_adapter import MCPBaseAdapter
