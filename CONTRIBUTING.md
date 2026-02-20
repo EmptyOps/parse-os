@@ -20,9 +20,9 @@
 
 ### End-to-End Environment Testing
 
-We are actively looking for contributors to validate Parse-OS automation across **different operating systems, hardware setups, and environments**.
+- We are actively looking for contributors to validate Parse-OS automation across **different operating systems, hardware setups, and environments**.
 
-Instead of predefined unit tests, contributors will execute **real OS-level automation workflows** and report results.
+- Instead of predefined unit tests, contributors will execute **real OS-level automation workflows** and report results.
 
 👉 The full execution process, tooling, and reporting workflow are described in the **End-to-End Test Execution – Parse-OS** section below.
 
