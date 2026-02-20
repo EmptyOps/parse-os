@@ -1,62 +1,82 @@
-# tests/agents_testing.py
+#  os_automation/tests/agents_testing.py
+
 import pyautogui
+import tempfile
+import os
+from pathlib import Path
 from os_automation.core.orchestrator import Orchestrator
 
+# -----------------------------
+# 🧪 Test Cases
+# -----------------------------
+TEST_CASES = [
+    # 📁 File System
+    "Go to file explorer and Open Documents folder",
+    "Create text.txt on Documents folder",
+    "Take a screenshot of current screen and save it as imageTest.png on Documents folder",
+
+    # 🌐 Browser
+    "Open Youtube in browser and play random music",
+    "Open gmail in browser and check for new mail",
+    "Search Python tutorial in Browser and click first link",
+    "Open gmail in browser, Click on compose to write new mail, write 'your-mail-address' in TO field, 'Test Automation' in subject field and 'This is a test' in body then send the mail",
+
+    # 📝 Text Editor
+    "Open text editor in system and type 'Meeting at 5' and save it using CTRL+S on Documents/Vedanshi folder as TestingNote.txt",
+
+    # ⚙️ System
+    "Open system settings and Turn on the Wi-Fi by clicking on toggle button",
+    "Open Calculator and do sum of 10 and 500",
+
+    # 💻 VS Code
+    "Open new Visual Studio Code window",
+    "Open new visual studio code window, create a new file using CTRL+N, type the code \"print('Hello Automation')\" and save it as test.py on Documents folder",
+    "Open Documents/test.py file and replace the 'Hello Automation' from print statement by 'Hello OS Automation' and save it using CTRL+S",
+    "Open VS Code extension panel using CTRL+SHIFT+X, search for Python extension and install it by clicking on install button",
+
+    # 🌍 FTP Advanced Test
+    "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
+
+]
+
+
+# -----------------------------
+# 🚀 Main Runner
+# -----------------------------
 def main():
     orch = Orchestrator()
 
-    # 1️⃣ Capture screenshot on the fly
-    screenshot_path = "/home/emptyops/Documents/Vedanshi/parse_os/temp_screenshot.png"
-    pyautogui.screenshot(screenshot_path)
+    print("\n==============================")
+    print("      AVAILABLE TEST CASES")
+    print("==============================\n")
 
-    # 2️⃣ Pass screenshot to OSAtlas + main agent
+    for index, value in enumerate(TEST_CASES, start=1):
+        print(f"{index}. {value}")
+
+    try:
+        choice = int(input("\nEnter test case number: "))
+        command = TEST_CASES[choice - 1]
+    except (ValueError, IndexError):
+        print("\n❌ Invalid choice. Please enter a valid number.\n")
+        return
+
+    # 📸 Dynamic Screenshot Path (OS Independent)
+    screenshot_path = Path(tempfile.gettempdir()) / "temp_screenshot.png"
+    pyautogui.screenshot(str(screenshot_path))
+
+    print("\n🚀 Running Test Case...\n")
+
     result = orch.run(
-        # "Search Python Tutorial on browser and open first link from result",
-        # "Open the browser, go to search bar and Search for 'open source automation' into Google and press Enter",
-        # "Click on 'File' menu in VS Code bbox and scroll up",
-        # "Open Terminal and list out the files",
-        # "Open browser and search Python tutorial",
-        # "Search youtube in browser and click on first link",
-        # "Search youtube in browser and click on Youtube icone",
-        # "Open file explorer and go to Documents Folder",
-        # "Open new visual studio code window", 
-        # "Open new visual studio code window and create python script name hello.py",
-        # "Click on 'file' menu in VS code",
-        # "Click on 'Edit' menu in VS code",
-        # "Create python.py script on Documents folder",
-        # "take a screenshot of current screen and save it as imageTest.png on Documents folder",
-        # "Open Documents/Vedanshi folder in the file explorer",
-        # "Open system Calculator and do sum of 10 and 500",
-        # "open Youtube in browser and play random music",
-        # "Go to file explorer and Open DeepSeek folder placed inside Documents folder",
-        # "Go to file explorer, Open Documents\DeepSeek folder ",
-        # "Open Vedanshi named folder",
-
-        
-        # "Go to file explorer and Open Documents folder",
-        # "Create text.txt on Documents folder",
-        # "take a screenshot of current screen and save it as imageTest.png on Documents folder",
-        # "open Youtube in browser and play random music",
-        # "open gmail in browser and check for new mail",
-        # "Open text editor in system and types 'Meeting at 5' and save it using CTRL+S on Documents/Vedanshi folder as TestingNote.txt",
-        # "Search Python tutorial in Browser and click first link",
-        # "Open setting of the system and Turn on the Wi-FI by click on toggle button of Wi-FI",
-        # "Open Calculator and do sum of 10 and 500",
-        # "open gmail in browser, Click on compose to write new mail, write 'your-mail-address' in to TO field, 'Test Automation' on subject field and 'This is a test' on body part of mail then sent the mail",
-
-
-        # "Open new Visual studio code window",
-        # "Open new visual studio code window, create a new file using CTRL+N, type the code 'print('Hello Automation')' and save it as test.py on Documents folder",
-        # "Open Documents/test.py file and replace the 'Hello Automation' from print statement by 'Hello OS Automation' and save it using CTRL+S",
-        "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
-        # "Open vs code extension panel using CTRL+SHIFT+X, search for python extension and install it by clicking on install button",
-
-        # "Open new visual studio code window, create a new file using CTRL+N, type the print statement with Hello Automation inside that and save it as test.py on Documents folder",
-
-        image_path=screenshot_path
+        command,
+        image_path=str(screenshot_path)
     )
 
+    print("\n==============================")
+    print("           RESULT")
+    print("==============================\n")
     print(result)
+    print("\n✅ Execution Completed.\n")
+
 
 if __name__ == "__main__":
     main()
