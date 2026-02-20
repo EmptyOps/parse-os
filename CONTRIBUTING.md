@@ -17,10 +17,14 @@
 
 ## 🧪 Contribution Required
 
-### Testing in Different Environments
-- 15 test cases will be shared soon
-- Help is needed to test across multiple environments
 
+### End-to-End Environment Testing
+
+We are actively looking for contributors to validate Parse-OS automation across **different operating systems, hardware setups, and environments**.
+
+Instead of predefined unit tests, contributors will execute **real OS-level automation workflows** and report results.
+
+👉 The full execution process, tooling, and reporting workflow are described in the **End-to-End Test Execution – Parse-OS** section below.
 
 ---
 
@@ -28,8 +32,8 @@
 
 This Section explains how to manually execute real OS-level automation flows in Parse-OS.
 
-- These are NOT unit tests.
-They are real OS-level execution validations.
+> These are NOT unit tests.
+> They are real OS-level execution validations.
 
 ---
 
