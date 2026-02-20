@@ -41,7 +41,6 @@ This method allows you to manually trigger real OS-level automation flows.
 
 ```
 os_automation/tests/agents_testing.py
-
 ```
 
 
@@ -51,7 +50,6 @@ From project root:
 
 ```
 PYTHONPATH=parse-os python3 -m parse-os.tests.agents_testing
-
 ```
 
 ### 🔍 Available Test Coverage Includes
