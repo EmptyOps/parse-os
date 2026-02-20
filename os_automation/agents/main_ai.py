@@ -6,6 +6,7 @@ import yaml
 import logging
 from typing import List, Dict, Any, Optional
 from openai import OpenAI   # Official client
+from os_automation.core.lifecycle import lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +399,16 @@ steps:
     description: "Press Enter"
 """.strip()
 
+        #lifecycle - emit  
+        context = {
+            "user_prompt": user_prompt,
+            "system_prompt": system_prompt,
+        }
+
+        lifecycle.emit("before_plan", context)
+        system_prompt = context.get("system_prompt", system_prompt)
+        
+
         response = self.client.chat.completions.create(
             model=self.model,
             temperature=0,
@@ -418,10 +429,21 @@ steps:
             parsed = yaml.safe_load(yaml_text)
             if not isinstance(parsed, dict) or "steps" not in parsed:
                 raise ValueError("Planner returned invalid YAML structure")
+              
+            # lifecycle - emit
+            context = {
+                "user_prompt": user_prompt,
+                "yaml_text": yaml_text,
+            }
+            lifecycle.emit("after_plan", context)
+            yaml_text = context.get("yaml_text", yaml_text)
+                
             return yaml_text
         except Exception as e:
             logger.error("Planner failed to produce YAML: %s", yaml_text)
             raise e
+        
+        
 
     # -----------------------------------------------------
     # Step 2 — Replan on failure

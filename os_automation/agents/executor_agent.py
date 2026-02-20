@@ -1186,6 +1186,7 @@ import pyautogui
 
 from os_automation.agents.validator_agent import ValidatorAgent
 from os_automation.core.registry import registry
+from os_automation.core.lifecycle import lifecycle
 
 # try to import MainAIAgent only if available (used for optional rewrite)
 try:
@@ -2299,6 +2300,17 @@ class ExecutorAgent:
         original_prompt: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
+        
+        
+        #lifecycle - emit
+        context = {
+            "step": step,
+            "execution_mode": self.execution_mode,
+        }
+        lifecycle.emit("before_step_execution", context)
+        step = context.get("step", step)
+        
+        
         if step is None:
             step = {
                 "step_id": step_id or 1,
@@ -2317,15 +2329,25 @@ class ExecutorAgent:
             max_attempts=max_attempts or self.max_attempts,
             original_prompt=original_prompt or step_description,
         )
+        #lifecycle - emit
+        parsed_result = yaml.safe_load(yaml_result)
 
-        try:
-            return yaml.safe_load(yaml_result)
-        except Exception:
-            return {
-                "execution": None,
-                "validation": {
-                    "validation_status": "fail",
-                    "reason": "invalid_yaml",
-                },
-                "raw": yaml_result,
-            }
+        context = {
+            "step": step,
+            "execution_result": parsed_result,
+        }
+        lifecycle.emit("after_step_execution", context)
+
+        return parsed_result
+
+        # try:
+        #     return yaml.safe_load(yaml_result)
+        # except Exception:
+        #     return {
+        #         "execution": None,
+        #         "validation": {
+        #             "validation_status": "fail",
+        #             "reason": "invalid_yaml",
+        #         },
+        #         "raw": yaml_result,
+        #     }

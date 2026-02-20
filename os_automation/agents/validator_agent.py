@@ -9,6 +9,8 @@ from typing import Dict, Any, Optional
 from PIL import Image, ImageChops, ImageStat
 
 from openai import OpenAI
+from os_automation.core.lifecycle import lifecycle
+
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +158,14 @@ class ValidatorAgent:
     # ========================= YAML Entry =========================
     def validate_step_yaml(self, exec_yaml: str) -> str:
         import yaml
+        
+        #lifecycle - emit
+        context = {
+            "step_yaml": exec_yaml
+        }
+        lifecycle.emit("before_validation", context)
+        exec_yaml = context.get("step_yaml", exec_yaml)
+
 
         try:
             data = yaml.safe_load(exec_yaml) or {}
@@ -462,10 +472,19 @@ class ValidatorAgent:
                 details["llm_confirmation"] = "fail"
 
         import yaml as _yaml
+        
+        #lifecycle - emit
 
-        return _yaml.safe_dump(
+        final_yaml_string = _yaml.safe_dump(
             {"validation_status": status, "details": details}
         )
+        
+        context = {
+            "validation_result": final_yaml_string
+        }
+        lifecycle.emit("after_validation", context)
+        
+        return context.get("validation_result", final_yaml_string)
 
     # ----------------------------------------------------------------
     # Optional: Advanced validator (kept as-is for compatibility)
