@@ -21,29 +21,28 @@
 - 15 test cases will be shared soon
 - Help is needed to test across multiple environments
 
+
 ---
 
-# 🎥 End-to-End Test Execution – Parse-OS
+# End-to-End Test Execution – Parse-OS
 
 This Section explains how to manually execute real OS-level automation flows in Parse-OS.
 
-⚠️ These are NOT unit tests.
+- These are NOT unit tests.
 They are real OS-level execution validations.
 
 ---
 
 ## 🧪 Using `agents_testing.py`
 
-This method allows you to manually trigger real OS-level automation flows.
 
-### 📂 File Location
+### File Location
 
 ```
 os_automation/tests/agents_testing.py
 ```
 
-
-### ▶️ How to Run
+### How to Run
 
 From project root:
 
@@ -51,17 +50,7 @@ From project root:
 PYTHONPATH=parse-os python3 -m parse-os.tests.agents_testing
 ```
 
-### 🔍 Available Test Coverage Includes
-
-
-- 📁 File system operations
-- 🌐 Browser automation
-- 📝 Text editor actions
-- ⚙️ System settings
-- 💻 VS Code automation
-- 🌍 FTP advanced workflow
-
-### 👉 This script allows contributors to:
+### This script allows contributors to:
 
 - Provide a natural language instruction
 - Capture current screen state
@@ -70,11 +59,9 @@ PYTHONPATH=parse-os python3 -m parse-os.tests.agents_testing
 
 ---
 
-## 🎥 Using Demo Video
+## 🎥 You can follow the step-by-step execution walkthrough here:
 
-You can also follow the step-by-step demo here:
-
->  **[Test Execution Demo – Parse-OS](https://youtu.be/aEsTHG5_Vf8)**
+>  **[Test Execution Walkthrough Video – Parse-OS](https://youtu.be/aEsTHG5_Vf8)**
 
 ### If you are testing by following the video:
 
