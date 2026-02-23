@@ -2307,9 +2307,13 @@ class ExecutorAgent:
             "step": step,
             "execution_mode": self.execution_mode,
         }
-        lifecycle.emit("before_step_execution", context)
+        context = lifecycle.emit("before_step_execution", context)
+
+        if context.get("handled"):
+            return context.get("execution_result")
+
         step = context.get("step", step)
-        
+
         
         if step is None:
             step = {
@@ -2336,9 +2340,9 @@ class ExecutorAgent:
             "step": step,
             "execution_result": parsed_result,
         }
-        lifecycle.emit("after_step_execution", context)
-
-        return parsed_result
+        context = lifecycle.emit("after_step_execution", context)
+        
+        return context.get("execution_result", parsed_result)
 
         # try:
         #     return yaml.safe_load(yaml_result)

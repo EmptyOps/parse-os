@@ -435,7 +435,7 @@ steps:
                 "user_prompt": user_prompt,
                 "yaml_text": yaml_text,
             }
-            lifecycle.emit("after_plan", context)
+            context = lifecycle.emit("before_plan", context)
             yaml_text = context.get("yaml_text", yaml_text)
                 
             return yaml_text

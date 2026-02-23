@@ -163,7 +163,7 @@ class ValidatorAgent:
         context = {
             "step_yaml": exec_yaml
         }
-        lifecycle.emit("before_validation", context)
+        context = lifecycle.emit("before_validation", context)
         exec_yaml = context.get("step_yaml", exec_yaml)
 
 
