@@ -1,10 +1,10 @@
-#  os_automation/tests/agents_testing.py
+#  os_automation/tests/agents_testing.py 
 
 import pyautogui
 import tempfile
 import os
 from pathlib import Path
-from os_automation.core.orchestrator import Orchestrator
+from os_automation.core.orchestrator import Orchestrator 
 
 # -----------------------------
 # 🧪 Test Cases
@@ -38,7 +38,6 @@ TEST_CASES = [
     "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
 
 ]
-
 
 # -----------------------------
 # 🚀 Main Runner
