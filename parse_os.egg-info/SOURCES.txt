@@ -1,16 +1,19 @@
 README.md
 pyproject.toml
 os_automation/__init__.py
+os_automation/agents/__init__.py
 os_automation/agents/executor_agent.py
 os_automation/agents/main_ai.py
 os_automation/agents/validator_agent.py
 os_automation/cli/cli.py
+os_automation/core/__init__.py
 os_automation/core/adapters.py
 os_automation/core/integration_contract.py
 os_automation/core/lifecycle.py
 os_automation/core/orchestrator.py
 os_automation/core/registry.py
 os_automation/core/tal.py
+os_automation/repos/__init__.py
 os_automation/repos/chrome_devtools_mcp_adapter.py
 os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
 os_automation/repos/mcp_adapter.py
@@ -28,6 +31,7 @@ os_automation/tools/pyautogui/py_auto_tool.py
 os_automation/tools/tool_wrapper_sikuli/sikuli_tool.py
 os_automation/utils/__init__.py
 os_automation/utils/logger.py
+os_automation/validators/__init__.py
 os_automation/validators/bbox_validator.py
 os_automation/validators/event_validator.py
 parse_os.egg-info/PKG-INFO
