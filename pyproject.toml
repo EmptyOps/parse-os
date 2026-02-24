@@ -1,1 +1,43 @@
-#
+[project]
+name = "parse-os"
+version = "0.1.0"
+description = "A modular lifecycle orchestration and automation framework for structured system workflows."
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+  { name = "EmptyOps ParseOS" }
+]
+
+maintainers = [
+  { name = "ParseOS Core Team"}
+]
+
+keywords = [
+  "automation",
+  "orchestration",
+  "lifecycle",
+  "framework",
+  "workflow-engine",
+  "event-driven",
+  "infrastructure"
+]
+
+dependencies = [
+  # Keep minimal — core should be lightweight
+]
+
+[project.urls]
+Homepage = "https://github.com/parseos/parse-os"
+Documentation = "https://docs.parseos.dev"
+Source = "https://github.com/parseos/parse-os"
+Issues = "https://github.com/parseos/parse-os/issues"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["os_automation*"]
+exclude = ["output*", "configs*"]
