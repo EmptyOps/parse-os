@@ -35,8 +35,7 @@ TEST_CASES = [
     "Open VS Code extension panel using CTRL+SHIFT+X, search for Python extension and install it by clicking on install button",
 
     # 🌍 FTP Advanced Test
-    "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal.",
-
+    "Open the terminal. Connect to FTP server ftp.emptyops.com on port 21 using username 'sub@spdev.emptyops.com' and password '6Ij2-xfP]WG4'. Navigate to the remote directory containing readme.txt in temp_for_wbc_final_test_7. Download the file index.php to ~/Downloads/. Wait until the download is complete and then close the terminal."
 ]
 
 # -----------------------------
@@ -46,7 +45,7 @@ def main():
     orch = Orchestrator()
 
     print("\n==============================")
-    print("      AVAILABLE TEST CASES")
+    print("      AVAILABLE TEST CASES      ")
     print("==============================\n") 
 
     for index, value in enumerate(TEST_CASES, start=1):
@@ -71,7 +70,7 @@ def main():
     )
 
     print("\n==============================")
-    print("           RESULT")
+    print("           RESULT               ")
     print("==============================\n")
     print(result)
     print("\n✅ Execution Completed.\n")
