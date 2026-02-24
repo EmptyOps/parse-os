@@ -36,7 +36,9 @@ class LifecycleManager:
         self._handlers[event].append(handler)
 
     def emit(self, event: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        print(f"[LIFECYCLE] Event fired: {event}")
         for handler in self._handlers.get(event, []):
+            print(f"  ↳ Handler: {handler.__name__}")
             result = handler(context)
             if isinstance(result, dict):
                 context.update(result)

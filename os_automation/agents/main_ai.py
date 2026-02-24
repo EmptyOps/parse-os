@@ -6,6 +6,7 @@ import yaml
 import logging
 from typing import List, Dict, Any, Optional
 from openai import OpenAI   # Official client
+from dotenv import load_dotenv
 from os_automation.core.lifecycle import lifecycle
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,13 @@ class MainAIAgent:
 
     def __init__(self, model: str = "gpt-4o"):
       
+        load_dotenv()
         self.model = model
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set. Export it before running Parse-OS.")
+        self.client = OpenAI(api_key=api_key)
         
         # ==== NEW FIELDS FOR OPENCOMPUTERUSE STYLE FEEDBACK LOOPS ====
         self.history: List[Dict[str, Any]] = []
