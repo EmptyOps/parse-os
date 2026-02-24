@@ -47,7 +47,7 @@ def main():
 
     print("\n==============================")
     print("      AVAILABLE TEST CASES")
-    print("==============================\n")
+    print("==============================\n") 
 
     for index, value in enumerate(TEST_CASES, start=1):
         print(f"{index}. {value}")
