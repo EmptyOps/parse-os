@@ -180,6 +180,6 @@ Please follow the simple flow below to keep reviews fast and collaboration smoot
 
 ### 💬 Communication & Support
 
-- Discuss new ideas or architecture-level changes in [Discussions](https://www.reddit.com/r/ParseOS/) or [Issues](https://github.com/EmptyOps/parse-os/issues).  
+- Discuss new ideas or architecture-level changes in [Discussions](https://discord.gg/2Dv7d69Gug) or [Issues](https://github.com/EmptyOps/parse-os/issues).  
 - Be kind, respectful, and collaborative.
 - For help or clarifications, comment directly on your PR or open a short discussion thread.
