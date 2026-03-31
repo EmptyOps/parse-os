@@ -24,7 +24,9 @@ def _load_config():
     
 class Orchestrator:
     def __init__(self, config_tool_override: str = None, config_detection_override: str = None,
-                 detection_name: str = None, executor_name: str = None, mcp_adapter: str = None):
+                 detection_name: str = None, executor_name: str = None, mcp_adapter: str = None,
+                 **kwargs,                                   # <<< CHANGED 1
+    ):
         self.config = _load_config()
 
         # Register adapters (store classes or factory lambdas)
@@ -102,219 +104,354 @@ class Orchestrator:
             "result": result,
         }
 
-
-    def run(self, user_prompt: str, image_path: str = None):
-        """
-        Adaptive run:
-        - If executor adapter is FULL => delegate to adapter.execute with the prompt.
-        - If PARTIAL => run local plan -> execute via executor_agent -> validate.
-        - If HYBRID => mix responsibilities (example stub, customize per-repo).
-        """
+    # changed when parse-os-pro integration CHANGES are mades
+    # def run(self, user_prompt: str, image_path: str = None):
+    #     """
+    #     Adaptive run:
+    #     - If executor adapter is FULL => delegate to adapter.execute with the prompt.
+    #     - If PARTIAL => run local plan -> execute via executor_agent -> validate.
+    #     - If HYBRID => mix responsibilities (example stub, customize per-repo).
+    #     """
         
-        # =====================================================
-        # 🔥 MCP HARD ROUTING (NO PLANNING)
-        # =====================================================
-        mcp_adapter = self.main_agent.can_use_mcp(user_prompt)
-        if mcp_adapter:
-            adapter_factory = registry.get_adapter(mcp_adapter)
-            if adapter_factory is None:
-                raise RuntimeError(f"MCP adapter '{mcp_adapter}' not registered")
+    #     # =====================================================
+    #     # 🔥 MCP HARD ROUTING (NO PLANNING)
+    #     # =====================================================
+    #     mcp_adapter = self.main_agent.can_use_mcp(user_prompt)
+    #     if mcp_adapter:
+    #         adapter_factory = registry.get_adapter(mcp_adapter)
+    #         if adapter_factory is None:
+    #             raise RuntimeError(f"MCP adapter '{mcp_adapter}' not registered")
 
-            adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+    #         adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
 
-            print(f"[MCP] Direct routing to '{mcp_adapter}' (planner skipped)")
-            return {
-                "mode": "mcp",
-                "adapter": mcp_adapter,
-                "result": adapter.execute({"task": user_prompt}),
-            }
+    #         print(f"[MCP] Direct routing to '{mcp_adapter}' (planner skipped)")
+    #         return {
+    #             "mode": "mcp",
+    #             "adapter": mcp_adapter,
+    #             "result": adapter.execute({"task": user_prompt}),
+    #         }
             
-        # =====================================================
-        # 🔥 1️⃣ PLANNER FIRST (MCP-aware)
-        # =====================================================
-        yaml_text = self.main_agent.plan(user_prompt)
-        parsed = yaml.safe_load(yaml_text)
+    #     # =====================================================
+    #     # 🔥 1️⃣ PLANNER FIRST (MCP-aware)
+    #     # =====================================================
+    #     yaml_text = self.main_agent.plan(user_prompt)
+    #     parsed = yaml.safe_load(yaml_text)
         
-        # # 🔥 MCP = TERMINAL EXECUTION MODE
-        # mcp_result = self._dispatch_mcp(parsed)
-        # if mcp_result is not None:
-        #     return mcp_result
+    #     # # 🔥 MCP = TERMINAL EXECUTION MODE
+    #     # mcp_result = self._dispatch_mcp(parsed)
+    #     # if mcp_result is not None:
+    #     #     return mcp_result
 
-        # # 🔥 MCP SHORT-CIRCUIT
-        # if isinstance(parsed, dict) and "mcp" in parsed:
-        #     mcp_info = parsed["mcp"]
-        #     adapter_name = mcp_info.get("adapter")
+    #     # # 🔥 MCP SHORT-CIRCUIT
+    #     # if isinstance(parsed, dict) and "mcp" in parsed:
+    #     #     mcp_info = parsed["mcp"]
+    #     #     adapter_name = mcp_info.get("adapter")
 
-        #     adapter_factory = registry.get_adapter(adapter_name)
-        #     if adapter_factory is None:
-        #         raise ValueError(f"MCP adapter '{adapter_name}' not registered")
+    #     #     adapter_factory = registry.get_adapter(adapter_name)
+    #     #     if adapter_factory is None:
+    #     #         raise ValueError(f"MCP adapter '{adapter_name}' not registered")
 
-        #     adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+    #     #     adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
 
-        #     print(f"[MCP] Routing task to '{adapter_name}'")
-        #     return adapter.execute(mcp_info)
+    #     #     print(f"[MCP] Routing task to '{adapter_name}'")
+    #     #     return adapter.execute(mcp_info)
 
-        # Resolve adapter factory/class
+    #     # Resolve adapter factory/class
+    #     exec_adapter_factory = registry.get_adapter(self.executor_choice)
+    #     exec_adapter = exec_adapter_factory() if callable(exec_adapter_factory) else exec_adapter_factory
+
+    #     mode = self.executor_contract.integration_mode if self.executor_contract else IntegrationMode.PARTIAL
+
+    #     if mode == IntegrationMode.FULL:
+    #         try:
+    #             print(f"[IntegrationMode: FULL] Handing full control to '{self.executor_choice}' adapter…")
+
+    #             # FULL adapters run their own planning, execution, validation internally.
+    #             result = exec_adapter.execute({"text": user_prompt})
+
+    #             if isinstance(result, dict) and result.get("status") == "success":
+    #                 print("[OpenComputerUse] Execution completed successfully.")
+    #                 return result
+
+    #             return {
+    #                 "status": "success",
+    #                 "adapter_output": result,
+    #                 "mode": "full",
+    #                 "executor": self.executor_choice
+    #             }
+
+    #         except Exception as e:
+    #             print(f"[OpenComputerUseAdapter] ❌ Error in FULL mode execution: {e}")
+    #             return {"status": "failed", "detail": str(e)}
+
+    #     # PARTIAL mode: your original pipeline (planner -> executor_agent -> validator)
+    #     elif mode == IntegrationMode.PARTIAL:
+            
+    #         print(f"[IntegrationMode: PARTIAL] Running enhanced 3-agent flow...")
+
+    #         # ---------------------------
+    #         # 1️⃣ Planner Agent → YAML steps
+    #         # ---------------------------
+    #         # yaml_text = self.main_agent.plan(user_prompt)
+
+    #         # Convert YAML → PlannedStep list
+    #         try:
+                
+    #             parsed = yaml.safe_load(yaml_text)
+                
+    #             if not isinstance(parsed, dict) or "steps" not in parsed:
+    #                 raise ValueError(f"Planner returned invalid YAML: {yaml_text}")
+
+    #             from os_automation.core.tal import PlannedStep
+    #             planned_steps = [
+    #                 PlannedStep(step_id=s["step_id"], description=s["description"])
+    #                 for s in parsed["steps"]
+    #             ]
+
+    #         except Exception as e:
+                
+    #             return {
+    #                 "user_prompt": user_prompt,
+    #                 "overall_status": "failed",
+    #                 "reason": f"Planner error: {e}",
+    #                 "raw_yaml": yaml_text,
+    #                 "mode": "partial"
+    #             }
+
+    #         final_step_reports = []
+
+
+    #         for step in planned_steps:
+    #             print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
+
+    #             step_result = self.executor_agent.run_step(
+    #                 step_id=step.step_id,
+    #                 step_description=step.description,
+    #                 validator_agent=self.validator_agent,
+    #                 max_attempts=3
+    #             )
+
+    #             # ---- Store into final report list ----
+    #             step_report = {
+    #                 "step": step.dict(),
+    #                 "execution": step_result.get("execution"),
+    #                 "validation": step_result.get("validation")
+    #             }
+    #             final_step_reports.append(step_report)
+
+    #             # ---- Feed observation into planner memory ----
+    #             observation = step_result.get("validation", {}).get("observation")
+    #             self.main_agent.receive_observation(step.step_id, step.description, observation)
+
+    #             # ---- Ask main agent if next step should change ----
+    #             next_steps = self.main_agent.decide_next_step()
+
+    #             if next_steps is None:
+    #                 continue  # proceed normally
+
+    #             # ---- Run replacement steps (dynamic replanning engine) ----
+    #             for ns in next_steps:
+    #                 ns_desc = ns["description"]
+    #                 tmp = self.executor_agent.run_step(
+    #                     step_id=ns.get("step_id", 9999),
+    #                     step_description=ns_desc,
+    #                     validator_agent=self.validator_agent,
+    #                     max_attempts=1
+    #                 )
+
+    #                 final_step_reports.append({
+    #                     "step": {"step_id": ns.get("step_id", 9999), "description": ns_desc},
+    #                     "execution": tmp.get("execution"),
+    #                     "validation": tmp.get("validation")
+    #                 })
+        
+    #     # HYBRID: a general example — tailor this to your adapter capabilities
+    #     elif mode == IntegrationMode.HYBRID:
+    #         detected = None
+    #         try:
+    #             detected = exec_adapter.detect({"image_path": image_path}) if hasattr(exec_adapter, "detect") else None
+    #         except Exception:
+    #             detected = None
+
+    #         sub_plan = []
+    #         if hasattr(exec_adapter, "plan"):
+    #             try:
+    #                 sub_plan = exec_adapter.plan(user_prompt) or []
+    #             except Exception:
+    #                 sub_plan = []
+
+    #         if not sub_plan:
+    #             sub_plan = self.main_agent.plan(user_prompt)
+
+    #         step_reports = []
+    #         selected_bbox = None
+    #         if detected:
+    #             for v in (detected or {}).values():
+    #                 if isinstance(v, dict) and "bbox" in v:
+    #                     selected_bbox = v["bbox"]
+    #                     break
+    #         selected_bbox = selected_bbox or [10,10,50,50]
+
+    #         for plan in sub_plan:
+    #             exec_out = self.executor_agent.execute(
+    #                 bbox=selected_bbox, event="click", executor_name=self.executor_choice
+    #             )
+    #             exec_result = ExecutionResult(
+    #                 step_id=getattr(plan, "step_id", 0),
+    #                 repo_used=self.executor_choice,
+    #                 decided_event="click",
+    #                 status=exec_out.get("status", "failed"),
+    #                 raw={"detection": detected, "exec_details": exec_out}
+    #             )
+    #             val = self.validator_agent.validate_step(plan.dict() if hasattr(plan, "dict") else dict(plan), exec_result.dict())
+    #             step_reports.append({
+    #                 "step": plan.dict() if hasattr(plan, "dict") else dict(plan),
+    #                 "execution": exec_result.dict(),
+    #                 "validation": val
+    #             })
+
+    #         overall_status = "success" if all(r["validation"]["validation_status"] == "pass" for r in step_reports) else "failed"
+    #         return {
+    #             "user_prompt": user_prompt,
+    #             "overall_status": overall_status,
+    #             "mode": "hybrid",
+    #             "steps": step_reports
+    #         }
+
+    #     else:
+    #         raise ValueError(f"Unsupported integration mode: {mode}")
+
+
+    def run(
+        self,
+        user_prompt: str,
+        image_path: str = None,
+        skip_mcp_routing: bool = False,             # <<< CHANGED 2
+    ):
+        """
+        skip_mcp_routing (default False):
+            Classic callers never pass this — 100% unchanged behaviour.
+            parse-os-pro passes True so the planner produces step YAML
+            instead of routing the whole browser prompt in one bulk MCP call.
+        """
+        if not skip_mcp_routing:                    # <<< CHANGED 3
+            mcp_adapter = self.main_agent.can_use_mcp(user_prompt)
+            if mcp_adapter:
+                adapter_factory = registry.get_adapter(mcp_adapter)
+                if adapter_factory is None:
+                    raise RuntimeError(f"MCP adapter '{mcp_adapter}' not registered")
+                adapter = adapter_factory() if callable(adapter_factory) else adapter_factory
+                print(f"[MCP] Direct routing to '{mcp_adapter}' (planner skipped)")
+                return {"mode": "mcp", "adapter": mcp_adapter, "result": adapter.execute({"task": user_prompt})}
+ 
+        yaml_text = self.main_agent.plan(user_prompt)
+        parsed    = yaml.safe_load(yaml_text)
         exec_adapter_factory = registry.get_adapter(self.executor_choice)
         exec_adapter = exec_adapter_factory() if callable(exec_adapter_factory) else exec_adapter_factory
-
         mode = self.executor_contract.integration_mode if self.executor_contract else IntegrationMode.PARTIAL
-
+ 
         if mode == IntegrationMode.FULL:
             try:
-                print(f"[IntegrationMode: FULL] Handing full control to '{self.executor_choice}' adapter…")
-
-                # FULL adapters run their own planning, execution, validation internally.
+                print(f"[IntegrationMode: FULL] Handing full control to '{self.executor_choice}' adapter...")
                 result = exec_adapter.execute({"text": user_prompt})
-
                 if isinstance(result, dict) and result.get("status") == "success":
-                    print("[OpenComputerUse] Execution completed successfully.")
                     return result
-
-                return {
-                    "status": "success",
-                    "adapter_output": result,
-                    "mode": "full",
-                    "executor": self.executor_choice
-                }
-
+                return {"status": "success", "adapter_output": result, "mode": "full", "executor": self.executor_choice}
             except Exception as e:
-                print(f"[OpenComputerUseAdapter] ❌ Error in FULL mode execution: {e}")
                 return {"status": "failed", "detail": str(e)}
-
-        # PARTIAL mode: your original pipeline (planner -> executor_agent -> validator)
+ 
         elif mode == IntegrationMode.PARTIAL:
-            
-            print(f"[IntegrationMode: PARTIAL] Running enhanced 3-agent flow...")
-
-            # ---------------------------
-            # 1️⃣ Planner Agent → YAML steps
-            # ---------------------------
-            # yaml_text = self.main_agent.plan(user_prompt)
-
-            # Convert YAML → PlannedStep list
+            print("[IntegrationMode: PARTIAL] Running enhanced 3-agent flow...")
             try:
-                
                 parsed = yaml.safe_load(yaml_text)
-                
                 if not isinstance(parsed, dict) or "steps" not in parsed:
                     raise ValueError(f"Planner returned invalid YAML: {yaml_text}")
-
                 from os_automation.core.tal import PlannedStep
                 planned_steps = [
                     PlannedStep(step_id=s["step_id"], description=s["description"])
                     for s in parsed["steps"]
                 ]
-
             except Exception as e:
-                
-                return {
-                    "user_prompt": user_prompt,
-                    "overall_status": "failed",
-                    "reason": f"Planner error: {e}",
-                    "raw_yaml": yaml_text,
-                    "mode": "partial"
-                }
-
+                return {"user_prompt": user_prompt, "overall_status": "failed",
+                        "reason": f"Planner error: {e}", "raw_yaml": yaml_text, "mode": "partial"}
+ 
             final_step_reports = []
-
-
             for step in planned_steps:
-                print(f"\n========== RUNNING STEP {step.step_id}: {step.description} ==========")
-
+                print(f"\n===== STEP {step.step_id}: {step.description} =====")
                 step_result = self.executor_agent.run_step(
                     step_id=step.step_id,
                     step_description=step.description,
                     validator_agent=self.validator_agent,
-                    max_attempts=3
+                    max_attempts=3,
                 )
-
-                # ---- Store into final report list ----
-                step_report = {
-                    "step": step.dict(),
-                    "execution": step_result.get("execution"),
-                    "validation": step_result.get("validation")
-                }
-                final_step_reports.append(step_report)
-
-                # ---- Feed observation into planner memory ----
+                final_step_reports.append({
+                    "step":       step.dict(),
+                    "execution":  step_result.get("execution"),
+                    "validation": step_result.get("validation"),
+                })
                 observation = step_result.get("validation", {}).get("observation")
                 self.main_agent.receive_observation(step.step_id, step.description, observation)
-
-                # ---- Ask main agent if next step should change ----
                 next_steps = self.main_agent.decide_next_step()
-
                 if next_steps is None:
-                    continue  # proceed normally
-
-                # ---- Run replacement steps (dynamic replanning engine) ----
+                    continue
                 for ns in next_steps:
                     ns_desc = ns["description"]
                     tmp = self.executor_agent.run_step(
-                        step_id=ns.get("step_id", 9999),
-                        step_description=ns_desc,
-                        validator_agent=self.validator_agent,
-                        max_attempts=1
+                        step_id=ns.get("step_id", 9999), step_description=ns_desc,
+                        validator_agent=self.validator_agent, max_attempts=1,
                     )
-
                     final_step_reports.append({
-                        "step": {"step_id": ns.get("step_id", 9999), "description": ns_desc},
-                        "execution": tmp.get("execution"),
-                        "validation": tmp.get("validation")
+                        "step":       {"step_id": ns.get("step_id", 9999), "description": ns_desc},
+                        "execution":  tmp.get("execution"),
+                        "validation": tmp.get("validation"),
                     })
-        
-        # HYBRID: a general example — tailor this to your adapter capabilities
+ 
+            # <<< CHANGED 4: was missing — original crashed every PARTIAL run
+            overall_status = "success" if all(
+                (r.get("validation") or {}).get("validation_status") == "pass"
+                for r in final_step_reports
+            ) else "failed"
+            return {"user_prompt": user_prompt, "overall_status": overall_status,
+                    "mode": "partial", "steps": final_step_reports}
+ 
         elif mode == IntegrationMode.HYBRID:
             detected = None
             try:
                 detected = exec_adapter.detect({"image_path": image_path}) if hasattr(exec_adapter, "detect") else None
             except Exception:
                 detected = None
-
             sub_plan = []
             if hasattr(exec_adapter, "plan"):
                 try:
                     sub_plan = exec_adapter.plan(user_prompt) or []
                 except Exception:
                     sub_plan = []
-
             if not sub_plan:
                 sub_plan = self.main_agent.plan(user_prompt)
-
-            step_reports = []
+            step_reports  = []
             selected_bbox = None
             if detected:
                 for v in (detected or {}).values():
                     if isinstance(v, dict) and "bbox" in v:
                         selected_bbox = v["bbox"]
                         break
-            selected_bbox = selected_bbox or [10,10,50,50]
-
+            selected_bbox = selected_bbox or [10, 10, 50, 50]
             for plan in sub_plan:
-                exec_out = self.executor_agent.execute(
-                    bbox=selected_bbox, event="click", executor_name=self.executor_choice
-                )
+                exec_out    = self.executor_agent.execute(bbox=selected_bbox, event="click", executor_name=self.executor_choice)
                 exec_result = ExecutionResult(
-                    step_id=getattr(plan, "step_id", 0),
-                    repo_used=self.executor_choice,
-                    decided_event="click",
-                    status=exec_out.get("status", "failed"),
-                    raw={"detection": detected, "exec_details": exec_out}
+                    step_id=getattr(plan, "step_id", 0), repo_used=self.executor_choice,
+                    decided_event="click", status=exec_out.get("status", "failed"),
+                    raw={"detection": detected, "exec_details": exec_out},
                 )
-                val = self.validator_agent.validate_step(plan.dict() if hasattr(plan, "dict") else dict(plan), exec_result.dict())
+                val = self.validator_agent.validate_step(
+                    plan.dict() if hasattr(plan, "dict") else dict(plan), exec_result.dict()
+                )
                 step_reports.append({
-                    "step": plan.dict() if hasattr(plan, "dict") else dict(plan),
-                    "execution": exec_result.dict(),
-                    "validation": val
+                    "step":       plan.dict() if hasattr(plan, "dict") else dict(plan),
+                    "execution":  exec_result.dict(),
+                    "validation": val,
                 })
-
             overall_status = "success" if all(r["validation"]["validation_status"] == "pass" for r in step_reports) else "failed"
-            return {
-                "user_prompt": user_prompt,
-                "overall_status": overall_status,
-                "mode": "hybrid",
-                "steps": step_reports
-            }
-
+            return {"user_prompt": user_prompt, "overall_status": overall_status, "mode": "hybrid", "steps": step_reports}
         else:
             raise ValueError(f"Unsupported integration mode: {mode}")
