@@ -1,126 +1,6 @@
-# os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
+# # os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
 
 # import subprocess
-# import json
-# import subprocess
-# import time
-# import select
-# from os_automation.repos.mcp_base_adapter import MCPBaseAdapter
-
-# class GeminiChromeDevToolsMCPAdapter(MCPBaseAdapter):
-#     """
-#     MCP adapter for Gemini CLI / API
-#     """
-
-#     MCP_TYPE = "llm"
-#     MCP_CAPABILITIES = [
-#         "reasoning",
-#         "planning",
-#         "code generation",
-#         "analysis",
-#         "web understanding"
-#     ]
-
-#     # def execute(self, payload: dict):
-#     #     """
-#     #     payload example:
-#     #     {
-#     #       "task": "Analyze this DOM snapshot and suggest next action",
-#     #       "context": {...}
-#     #     }
-#     #     """
-
-#     #     task = payload.get("task")
-#     #     context = payload.get("context", {})
-
-#     #     if not task:
-#     #         return {"status": "failed", "error": "missing task"}
-
-#     #     prompt = self._build_prompt(task, context)
-
-#     #     # ---- Option A: Gemini CLI (what you already installed) ----
-#     #     proc = subprocess.run(
-#     #         ["gemini", "prompt", prompt],
-#     #         capture_output=True,
-#     #         text=True
-#     #     )
-
-#     #     if proc.returncode != 0:
-#     #         return {
-#     #             "status": "failed",
-#     #             "stderr": proc.stderr
-#     #         }
-
-#     #     return {
-#     #         "status": "success",
-#     #         "output": proc.stdout.strip()
-#     #     }
-
-#     def execute(self, payload: dict):
-#         task = payload.get("task")
-#         if not task:
-#             return {"status": "failed", "error": "missing task"}
-
-#         proc = subprocess.Popen(
-#             ["gemini"],
-#             stdin=subprocess.PIPE,
-#             stdout=subprocess.PIPE,
-#             stderr=subprocess.PIPE,
-#             text=True,
-#             bufsize=1
-#         )
-
-#         output_lines = []
-
-#         # Wait for Gemini prompt
-#         while True:
-#             line = proc.stdout.readline()
-#             if not line:
-#                 break
-#             output_lines.append(line)
-
-#             if line.strip().endswith(">"):
-#                 break
-
-#         # Now Gemini is READY — send the task
-#         proc.stdin.write(task + "\n")
-#         proc.stdin.flush()
-
-#         # Give agent time to work
-#         time.sleep(2)
-
-#         # Exit cleanly
-#         proc.stdin.write("exit\n")
-#         proc.stdin.flush()
-
-#         stdout, stderr = proc.communicate(timeout=180)
-
-#         return {
-#             "status": "success",
-#             "output": "".join(output_lines) + stdout
-#         }
-
-
-#     def _build_prompt(self, task: str, context: dict) -> str:
-#         if not context:
-#             return task
-
-#         return f"""
-# TASK:
-# {task}
-
-# CONTEXT:
-# {json.dumps(context, indent=2)}
-# """.strip()
-
-
-# os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
-# import os
-# import pty
-# import select
-# import subprocess
-# import time
-
 # from os_automation.repos.mcp_base_adapter import MCPBaseAdapter
 
 
@@ -138,85 +18,81 @@
 #         if not task:
 #             return {"status": "failed", "error": "missing task"}
 
-#         master_fd, slave_fd = pty.openpty()
+#         try:
+#             proc = subprocess.run(
+#                 ["./run_gemini_mcp.sh", task],
+#                 text=True,
+#                 capture_output=True,
+#                 timeout=300
+#             )
 
-#         proc = subprocess.Popen(
-#             ["gemini"],
-#             stdin=slave_fd,
-#             stdout=slave_fd,
-#             stderr=slave_fd,
-#             close_fds=True
-#         )
-#         os.close(slave_fd)
-
-#         output = ""
-
-#         def read_until_prompt(timeout=60):
-#             """Wait until Gemini shows a command prompt '>'"""
-#             nonlocal output
-#             start = time.time()
-#             while time.time() - start < timeout:
-#                 r, _, _ = select.select([master_fd], [], [], 0.1)
-#                 if master_fd in r:
-#                     data = os.read(master_fd, 4096).decode(errors="ignore")
-#                     output += data
-#                     if "\n> " in output or output.rstrip().endswith(">"):
-#                         return True
-#             return False
-
-#         def send(cmd: str, wait=1.5):
-#             """Send a command as if typed by a human"""
-#             nonlocal output
-#             os.write(master_fd, (cmd + "\n").encode())
-#             time.sleep(wait)
-#             while True:
-#                 r, _, _ = select.select([master_fd], [], [], 0.1)
-#                 if master_fd in r:
-#                     try:
-#                         output += os.read(master_fd, 4096).decode(errors="ignore")
-#                     except OSError:
-#                         break
-#                 else:
-#                     break
-
-#         # 1️⃣ Wait for Gemini REPL
-#         if not read_until_prompt():
 #             return {
-#                 "status": "failed",
-#                 "error": "Gemini prompt not detected",
-#                 "output": output
+#                 "status": "success" if proc.returncode == 0 else "failed",
+#                 "output": proc.stdout,
+#                 "error": proc.stderr if proc.returncode else None
 #             }
 
-#         # 2️⃣ (Optional) Ensure IDE companion (safe if already installed)
-#         send("/ide install", wait=2)
+#         except Exception as e:
+#             return {
+#                 "status": "failed",
+#                 "error": str(e)
+#             }
 
-#         # 3️⃣ (Optional) Verify MCP connectivity
-#         send("/mcp", wait=2)
 
-#         # 4️⃣ Send natural language task
-#         send(task, wait=6)
-
-#         # 5️⃣ Quit cleanly
-#         send("/quit", wait=1)
-
-#         return {
-#             "status": "success",
-#             "output": output
-#         }
 
 # os_automation/repos/gemini_chrome_devtools_mcp_adapter.py
+#
+# CHANGES FROM ORIGINAL (marked <<< CHANGED):
+#
+#   1. Script path reads from GEMINI_MCP_SCRIPT env var instead of
+#      hardcoded "./run_gemini_mcp.sh"
+#      Why: hardcoded relative path only works when parse-os is started
+#           from the exact repo root. Any other working directory silently
+#           fails with "file not found".
+#
+#   2. Timeout reads from GEMINI_MCP_TIMEOUT env var instead of
+#      hardcoded 300
+#      Why: consistency with parse-os-pro's MCPStepService which already
+#           reads this from settings. Both layers now respect the same var.
+#
+#   3. Error response includes returncode for easier debugging
+#
+# THE EXECUTE LOGIC IS IDENTICAL TO THE ORIGINAL.
+# Classic parse-os flow (browser_auto_script_mode=False):
+#   Orchestrator.run() → can_use_mcp() → "gemini_mcp_chrome_devtools"
+#   → this adapter → run_gemini_mcp.sh "plain task string"
+#   → run_gemini_mcp.sh classic branch (unchanged) → Gemini executes full task
+# ─────────────────────────────────────────────────────────────────────────────
 
+import os
 import subprocess
 from os_automation.repos.mcp_base_adapter import MCPBaseAdapter
 
 
+# Read from env so the path works regardless of working directory.        # <<< CHANGED 1
+_GEMINI_SCRIPT  = os.getenv("GEMINI_MCP_SCRIPT",  "./run_gemini_mcp.sh") # <<< CHANGED 1
+_GEMINI_TIMEOUT = int(os.getenv("GEMINI_MCP_TIMEOUT", "300"))             # <<< CHANGED 2
+
+
 class GeminiChromeDevToolsMCPAdapter(MCPBaseAdapter):
+    """
+    Classic parse-os adapter for Gemini Chrome DevTools MCP.
+
+    Used when browser_auto_script_mode=False (standard parse-os flow).
+    Receives the full user task as a single string and delegates entirely
+    to run_gemini_mcp.sh which handles the complete browser automation.
+
+    In pro mode (browser_auto_script_mode=True) this adapter is NOT used —
+    parse-os-pro's MCPStepService calls run_gemini_mcp.sh directly with a
+    JSON payload file, one step at a time.
+    """
+
     MCP_TYPE = "llm"
     MCP_CAPABILITIES = [
         "reasoning",
         "planning",
         "analysis",
-        "web_understanding"
+        "web_understanding",
     ]
 
     def execute(self, payload: dict):
@@ -226,20 +102,37 @@ class GeminiChromeDevToolsMCPAdapter(MCPBaseAdapter):
 
         try:
             proc = subprocess.run(
-                ["./run_gemini_mcp.sh", task],
+                [_GEMINI_SCRIPT, task],                 # <<< CHANGED 1: was "./run_gemini_mcp.sh"
                 text=True,
                 capture_output=True,
-                timeout=300
+                timeout=_GEMINI_TIMEOUT,                # <<< CHANGED 2: was 300
             )
 
             return {
-                "status": "success" if proc.returncode == 0 else "failed",
-                "output": proc.stdout,
-                "error": proc.stderr if proc.returncode else None
+                "status":     "success" if proc.returncode == 0 else "failed",
+                "output":     proc.stdout,
+                "error":      proc.stderr if proc.returncode else None,
+                "returncode": proc.returncode,          # <<< CHANGED 3: added for debugging
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "failed",
+                "error":  f"gemini script timed out after {_GEMINI_TIMEOUT}s",
+            }
+
+        except FileNotFoundError:
+            return {
+                "status": "failed",
+                "error":  (
+                    f"run_gemini_mcp.sh not found at '{_GEMINI_SCRIPT}'. "
+                    "Set the GEMINI_MCP_SCRIPT environment variable to the "
+                    "absolute path of run_gemini_mcp.sh inside your parse-os clone."
+                ),
             }
 
         except Exception as e:
             return {
                 "status": "failed",
-                "error": str(e)
+                "error":  str(e),
             }
