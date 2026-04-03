@@ -5,6 +5,8 @@ os_automation/agents/__init__.py
 os_automation/agents/executor_agent.py
 os_automation/agents/main_ai.py
 os_automation/agents/validator_agent.py
+os_automation/api/__init__.py
+os_automation/api/server.py
 os_automation/cli/cli.py
 os_automation/core/__init__.py
 os_automation/core/adapters.py

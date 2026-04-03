@@ -48,6 +48,10 @@
 #     }
 #   }
 
+
+#!/usr/bin/env bash
+
+
 set -e
 
 INPUT="$1"
