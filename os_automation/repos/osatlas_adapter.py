@@ -502,36 +502,74 @@ class OSAtlasAdapter(BaseAdapter):
     #         "type": "osatlas_bbox"
     #     }
     
+    ### os atlas ----> changes 
+    # def detect(self, step: Dict[str, Any]) -> Dict[str, Any]:
+    #     image_path = step.get("image_path")
+    #     query = step.get("text") or step.get("description") or ""
+
+    #     if not image_path or not os.path.exists(image_path):
+    #         return {"bbox": None, "point": None, "confidence": 0.0, "type": "none"}
+
+    #     # ---- Call OS-Atlas ----
+    #     resp = self._call_predict(image_path, query)
+    #     if "error" in resp:
+    #         return {"bbox": None, "point": None, "confidence": 0.0, "type": "error", "raw": resp}
+
+    #     # ---- Extract bbox from server ----
+    #     bbox = resp.get("response")
+    #     if not bbox or len(bbox) < 4:
+    #         return {"bbox": None, "point": None, "confidence": 0.0, "type": "no_bbox", "raw": resp}
+
+    #     x1, y1, x2, y2 = bbox
+    #     # Convert to (x,y,w,h)
+    #     w = max(1, x2 - x1)
+    #     h = max(1, y2 - y1)
+
+    #     cx = int((x1 + x2) / 2)
+    #     cy = int((y1 + y2) / 2)
+
+    #     return {
+    #         "bbox": [x1, y1, w, h],
+    #         "point": [cx, cy],
+    #         "confidence": 1.0,  # OS-Atlas does not return confidence
+    #         "raw": resp,
+    #         "type": "osatlas_bbox",
+    #     }
     
+    # os_automation/repos/osatlas_adapter.py
+
     def detect(self, step: Dict[str, Any]) -> Dict[str, Any]:
         image_path = step.get("image_path")
         query = step.get("text") or step.get("description") or ""
-
+    
         if not image_path or not os.path.exists(image_path):
             return {"bbox": None, "point": None, "confidence": 0.0, "type": "none"}
-
-        # ---- Call OS-Atlas ----
+    
         resp = self._call_predict(image_path, query)
         if "error" in resp:
             return {"bbox": None, "point": None, "confidence": 0.0, "type": "error", "raw": resp}
-
-        # ---- Extract bbox from server ----
+    
         bbox = resp.get("response")
         if not bbox or len(bbox) < 4:
             return {"bbox": None, "point": None, "confidence": 0.0, "type": "no_bbox", "raw": resp}
-
+    
+        # ✅ Server already scaled — direct use
         x1, y1, x2, y2 = bbox
-        # Convert to (x,y,w,h)
         w = max(1, x2 - x1)
         h = max(1, y2 - y1)
-
         cx = int((x1 + x2) / 2)
         cy = int((y1 + y2) / 2)
-
+    
+        # ✅ Debug log
+        logger.debug(
+            f"[OSAtlas] bbox={bbox} | center=({cx},{cy}) | "
+            f"raw_bbox={resp.get('raw_bbox')} | img_size={resp.get('image_size')}"
+        )
+    
         return {
             "bbox": [x1, y1, w, h],
             "point": [cx, cy],
-            "confidence": 1.0,  # OS-Atlas does not return confidence
+            "confidence": 1.0,
             "raw": resp,
             "type": "osatlas_bbox",
         }
