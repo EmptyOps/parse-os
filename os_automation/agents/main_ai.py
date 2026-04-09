@@ -449,7 +449,48 @@ steps:
             logger.error("Planner failed to produce YAML: %s", yaml_text)
             raise e
         
-        
+    def plan_steps_only(self, user_prompt: str, extra_system_prompt: str = "") -> str:
+        """
+        Called exclusively by parse-os-pro's ProOrchestrator.
+        Skips the can_use_mcp() short-circuit — always calls the LLM.
+        Returns step YAML with is_major tags.
+        """
+        self.original_prompt = user_prompt
+        self.history = []
+    
+        system_prompt = (
+            "You are a browser automation planner. "
+            "Break the user's task into fine-grained atomic browser steps.\n\n"
+            "OUTPUT FORMAT (pure YAML, no markdown fences, no explanation):\n\n"
+            "steps:\n"
+            "  - step_id: 1\n"
+            "    description: \"...\"\n"
+            "    is_major: false\n"
+            "    expected_selector: null\n"
+        )
+    
+        if extra_system_prompt:
+            system_prompt = system_prompt + "\n\n" + extra_system_prompt
+    
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=0,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+        )
+    
+        raw_text  = response.choices[0].message.content or ""
+        yaml_text = _extract_raw_yaml_block(raw_text)
+    
+        parsed = yaml.safe_load(yaml_text)
+        if not isinstance(parsed, dict) or "steps" not in parsed:
+            raise ValueError(
+                f"plan_steps_only: LLM returned no 'steps' key.\nRaw: {raw_text!r}"
+            )
+    
+        return yaml_text 
 
     # -----------------------------------------------------
     # Step 2 — Replan on failure

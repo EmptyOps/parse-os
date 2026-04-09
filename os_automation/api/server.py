@@ -350,6 +350,24 @@ async def parseos_run_get(
     )
     return await (_run_classic(req) if not req.browser_auto_script_mode
                   else _run_pro(req))
+    
+    
+@app.post("/parseos/run", response_model=RunResponse)
+async def parseos_run_post(
+    prompt:                   str  = Query(...),
+    session_id:               str  = Query(...),
+    project_link:             str  = Query(""),
+    browser_auto_script_mode: bool = Query(False),
+) -> RunResponse:
+    """Alias for KiloCode MCP which POSTs to /parseos/run with query params."""
+    req = RunRequest(
+        session_id=session_id,
+        user_prompt=prompt,
+        url=project_link,
+        browser_auto_script_mode=browser_auto_script_mode,
+    )
+    return await (_run_classic(req) if not req.browser_auto_script_mode
+                  else _run_pro(req))
 
 
 # ── Format B: POST /run — for direct curl/Postman testing ────────────────────

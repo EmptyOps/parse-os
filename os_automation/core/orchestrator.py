@@ -327,12 +327,19 @@ class Orchestrator:
         user_prompt: str,
         image_path: str = None,
         skip_mcp_routing: bool = False,             # <<< CHANGED 2
+        pre_planned_yaml: str = None,               # <<< CHANGED 4
     ):
         """
         skip_mcp_routing (default False):
             Classic callers never pass this — 100% unchanged behaviour.
             parse-os-pro passes True so the planner produces step YAML
             instead of routing the whole browser prompt in one bulk MCP call.
+ 
+        pre_planned_yaml (default None):
+            parse-os-pro passes the YAML it already obtained from plan_steps_only()
+            so the planner is NOT called a second time. This eliminates the
+            double-LLM-call problem where pre-plan produces 14 steps but the
+            second plan() call inside this method produces 16 different steps.
         """
         if not skip_mcp_routing:                    # <<< CHANGED 3
             mcp_adapter = self.main_agent.can_use_mcp(user_prompt)
@@ -344,11 +351,16 @@ class Orchestrator:
                 print(f"[MCP] Direct routing to '{mcp_adapter}' (planner skipped)")
                 return {"mode": "mcp", "adapter": mcp_adapter, "result": adapter.execute({"task": user_prompt})}
  
-        yaml_text = self.main_agent.plan(user_prompt)
-        parsed    = yaml.safe_load(yaml_text)
+        # <<< CHANGED 5: use pre_planned_yaml if provided, else call planner
+        if pre_planned_yaml:
+            yaml_text = pre_planned_yaml
+        else:
+            yaml_text = self.main_agent.plan(user_prompt)
+ 
+        parsed               = yaml.safe_load(yaml_text)
         exec_adapter_factory = registry.get_adapter(self.executor_choice)
-        exec_adapter = exec_adapter_factory() if callable(exec_adapter_factory) else exec_adapter_factory
-        mode = self.executor_contract.integration_mode if self.executor_contract else IntegrationMode.PARTIAL
+        exec_adapter         = exec_adapter_factory() if callable(exec_adapter_factory) else exec_adapter_factory
+        mode                 = self.executor_contract.integration_mode if self.executor_contract else IntegrationMode.PARTIAL
  
         if mode == IntegrationMode.FULL:
             try:
@@ -406,7 +418,7 @@ class Orchestrator:
                         "validation": tmp.get("validation"),
                     })
  
-            # <<< CHANGED 4: was missing — original crashed every PARTIAL run
+            # <<< CHANGED 6: was missing — original crashed every PARTIAL run
             overall_status = "success" if all(
                 (r.get("validation") or {}).get("validation_status") == "pass"
                 for r in final_step_reports
