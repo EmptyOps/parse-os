@@ -1,56 +1,33 @@
-# #!/usr/bin/env bash
-# set -e
-
-# TASK="$1"
-
-# if [ -z "$TASK" ]; then
-#   echo "No task provided"
-#   exit 1
-# fi
-
-# export TERM=dumb
-# export NO_COLOR=1
-# export GEMINI_NO_COLOR=1
-
-# gemini --yolo <<EOF
-# /ide disable
-# Using chrome-devtools MCP.
-# $TASK
-# /quit
-# EOF
-
-
-
 #!/usr/bin/env bash
 # run_gemini_mcp.sh
 #
-# CHANGES FROM ORIGINAL (marked <<< CHANGED):
-#   Detects whether $1 is a .json file (pro mode) or a plain string (classic).
+# Two modes depending on what $1 is:
 #
-#   Classic mode ($1 = plain task string):
-#     Behaviour IDENTICAL to original — same heredoc, same Gemini call.
+# CLASSIC MODE ($1 = plain task string):
+#   Called by parse-os's GeminiChromeDevToolsMCPAdapter for full browser tasks.
+#   Passes the task string directly to Gemini. Gemini handles the full task.
+#   Example: run_gemini_mcp.sh "search for python tutorials on google"
 #
-#   Pro mode ($1 = path to JSON payload file):
-#     Reads instruction + url from the JSON file.
-#     Asks Gemini to respond ONLY with structured JSON containing an
-#     "element" key so parse-os-pro can extract the CSS selector.
+# PRO MODE ($1 = path to a .json file):
+#   Called by parse-os-pro's MCPStepService for one step at a time.
+#   Reads instruction + url from the JSON file.
+#   Instructs Gemini to respond with structured JSON containing the selector.
+#   Example: run_gemini_mcp.sh /tmp/step_payload_abc.json
 #
-#   JSON response shape parse-os-pro expects:
+# JSON file format (pro mode input):
+#   { "instruction": "click the login button", "url": "https://example.com" }
+#
+# Gemini response format (pro mode output):
 #   {
-#     "action":  "click"|"type"|"scroll"|"hover",
-#     "text":    "value to type" (type actions only),
+#     "action": "click",
 #     "element": {
-#       "data-testid":  "...",
-#       "id":           "...",
-#       "aria-label":   "...",
-#       "css_selector": "full CSS selector",
-#       "xpath":        "XPath fallback"
+#       "css_selector": "#login-btn",
+#       "id": "login-btn",
+#       "data-testid": "login-button",
+#       "aria-label": "Login",
+#       "xpath": "//button[@id='login-btn']"
 #     }
 #   }
-
-
-#!/usr/bin/env bash
-
 
 set -e
 
@@ -65,18 +42,18 @@ export TERM=dumb
 export NO_COLOR=1
 export GEMINI_NO_COLOR=1
 
-# ── Detect mode ───────────────────────────────────────────────────────────────
+# ── Detect pro vs classic ─────────────────────────────────────────────────────
 
 if [[ "$INPUT" == *.json ]]; then
-  # <<< CHANGED: pro mode — JSON file payload
 
+  # ── PRO MODE: read instruction and url from JSON file ─────────────────────
   if [ ! -f "$INPUT" ]; then
     echo '{"error": "payload file not found"}' >&2
     exit 1
   fi
 
-  INSTRUCTION=$(python3 -c "import json,sys; d=json.load(open('$INPUT')); print(d.get('instruction',''))")
-  URL=$(python3 -c "import json,sys; d=json.load(open('$INPUT')); print(d.get('url',''))" 2>/dev/null || echo "")
+  INSTRUCTION=$(python3 -c "import json; d=json.load(open('$INPUT')); print(d.get('instruction',''))")
+  URL=$(python3 -c "import json; d=json.load(open('$INPUT')); print(d.get('url',''))" 2>/dev/null || echo "")
 
   if [ -n "$URL" ]; then
     TASK_TEXT="Navigate to $URL. Then: $INSTRUCTION"
@@ -86,17 +63,19 @@ if [[ "$INPUT" == *.json ]]; then
 
   PROMPT="$TASK_TEXT
 
-IMPORTANT: Respond ONLY with a single JSON object. No markdown, no explanation.
-Required structure:
+IMPORTANT: After performing the action, respond ONLY with a single JSON object.
+No markdown fences. No explanation. No extra text. Just the JSON.
+
+Required JSON structure:
 {
-  \"action\": \"click\" or \"type\" or \"scroll\" or \"hover\",
-  \"text\": \"text to type if action is type, otherwise omit this key\",
+  \"action\": \"click\" or \"type\" or \"scroll\" or \"hover\" or \"navigate\",
+  \"text\": \"text you typed (only include if action is type)\",
   \"element\": {
-    \"data-testid\": \"value if present, otherwise omit\",
-    \"id\": \"element id if present, otherwise omit\",
-    \"aria-label\": \"value if present, otherwise omit\",
-    \"css_selector\": \"full CSS selector\",
-    \"xpath\": \"XPath as fallback\"
+    \"css_selector\": \"the exact CSS selector of the element you interacted with\",
+    \"id\": \"element id attribute if it has one\",
+    \"data-testid\": \"data-testid value if present\",
+    \"aria-label\": \"aria-label value if present\",
+    \"xpath\": \"XPath expression as fallback\"
   }
 }"
 
@@ -108,8 +87,8 @@ $PROMPT
 EOF
 
 else
-  # <<< UNCHANGED: classic mode — identical to original
 
+  # ── CLASSIC MODE: pass plain task string directly to Gemini ───────────────
   TASK="$INPUT"
 
   gemini --yolo <<EOF
