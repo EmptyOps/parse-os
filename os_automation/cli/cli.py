@@ -19,3 +19,4 @@ def run(prompt, image, tool, detection):
 
 if __name__ == "__main__":
     cli()
+
