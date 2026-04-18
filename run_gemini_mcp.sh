@@ -52,7 +52,17 @@ if [[ "$INPUT" == *.json ]]; then
     exit 1
   fi
 
-  INSTRUCTION=$(python3 -c "import json; d=json.load(open('$INPUT')); print(d.get('instruction',''))")
+
+  # Replace inline python3 -c with a proper temp script or use jq, OR at minimum:
+  INSTRUCTION=$(python3 -c "
+  import json, sys
+  with open(sys.argv[1]) as f:
+      d = json.load(f)
+  print(d.get('instruction', ''))
+  " "$INPUT")   # ← pass path as argv[1], not interpolated into the string
+
+  # INSTRUCTION=$(python3 -c "import json; d=json.load(open('$INPUT')); print(d.get('instruction',''))")
+
   URL=$(python3 -c "import json; d=json.load(open('$INPUT')); print(d.get('url',''))" 2>/dev/null || echo "")
 
   if [ -n "$URL" ]; then
