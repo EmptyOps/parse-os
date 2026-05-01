@@ -100,7 +100,8 @@ _launch_chrome() {
     --disable-client-side-phishing-detection \
     --disable-sync \
     --user-data-dir="$CHROME_PROFILE_DIR" \
-    about:blank \
+    --no-startup-window \
+    # about:blank \
     > /tmp/parse-os-chrome.log 2>&1 &
   local waited=0
   while ! _chrome_running; do
@@ -156,6 +157,8 @@ print(d.get('url', ''))
   PROMPT="$TASK_TEXT
 
 RULES:
+- NEVER use the new_page tool. NEVER open a new tab. ALWAYS use navigate_page on the existing tab.
+- If you need to navigate to a URL: use navigate_page with the URL on the current tab.
 - Perform ONLY the one action described. Do not navigate, scroll, or click anything extra.
 - If the instruction says 'press Enter', 'submit', or 'perform the search': dispatch a keyboard Enter keypress on the currently focused element using the keyboard API. Set action=key and key=Enter. Do NOT type any text.
 - If the instruction says 'wait for page to load' or 'wait for results': take a screenshot to observe the current page state. Set action=navigate and leave element fields empty.
