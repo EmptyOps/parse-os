@@ -83,7 +83,19 @@ class MainAIAgent:
             "fill form",
             "web automation",
             "browser automation",
-            "test website"
+            "test website",
+            "google",
+            "youtube",
+            "gmail",
+            "search on",
+            "search for",
+            "go to http",
+            "navigate to",
+            "open http",
+            "open https",
+            ".com",
+            ".org",
+            ".net",
         ]
 
         if any(k in text for k in chrome_keywords):
